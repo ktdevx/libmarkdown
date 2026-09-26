@@ -44,6 +44,12 @@ PR の説明には、少なくとも次の内容を記載します。
 - AST のノードや所有権の変更
 - CommonMark の解釈やシリアライズ結果の変更
 
+## アーキテクチャ決定記録（ADR）
+
+アーキテクチャ上重要な決定を行った場合は、ADR に記録します。
+
+ADR の運用方針は [決定事項](docs/decisions/README.md) を参照してください。
+
 ## `main` の保護
 
 GitHub の Branch protection または Rulesets で、少なくとも次を設定します。
