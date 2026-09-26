@@ -95,3 +95,17 @@ GitHub の Branch protection または Rulesets で、少なくとも次を設�
 - メモリ所有権やカスタムアロケータに関係する変更では、解放処理を確認する。
 
 CI の対象環境やテスト方法の詳細は、実装の進行に合わせて追加します。
+
+## CommonMark フィクスチャの更新
+
+CommonMark 適合性テストのフィクスチャは、CommonMark Spec 0.31.2 から抽出して生成した C データをリポジトリで管理します。
+
+通常の configure、build、test では Node.js、ネットワークまたは仕様書の取得を要求してはなりません。
+
+フィクスチャを更新する場合は、次の手順に従います。
+
+1. `https://spec.commonmark.org/0.31.2/spec.txt` から仕様書を手動で取得し、更新 PR の説明に取得元と仕様バージョンを記載する。
+2. `node tools/extract_commonmark_examples.js path/to/spec.txt` を実行して、`tests/fixtures/commonmark_0_31_2_examples.c` と対応ヘッダを生成する。
+3. 生成ファイルのヘッダに、CommonMark Spec 0.31.2、取得元 URL、および CommonMark 仕様書のCC BY-SA 4.0 帰属表示を含める。
+4. 生成ツールが出力する example 数と入力仕様書の SHA-256 を PR 説明に記録し、生成ファイルの差分で追加、削除および変更された example をレビューする。
+5. CMake の configure、build、test を実行し、CommonMark 適合性テストがオフラインで成功することを確認する。
