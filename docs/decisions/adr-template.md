@@ -1,10 +1,10 @@
 ---
 # これらのメタデータ要素は任意である。必要に応じて削除してよい。
-status: "{proposed | rejected | accepted | deprecated | … | superseded by ADR-0123"
-date: {決定が最後に更新された日付（YYYY-MM-DD）}
-decision-makers: {決定に関与した全員の一覧}
-consulted: {意見を求めた全員の一覧（通常は分野の専門家）。双方向のコミュニケーションを行った相手}
-informed: {進捗を共有する全員の一覧。一方向のコミュニケーションを行う相手}
+status: "{proposed | rejected | accepted | deprecated | superseded by ADR-0123}"
+date: "YYYY-MM-DD"
+decision-makers: "{決定に関与した全員の一覧}"
+consulted: "{意見を求めた全員の一覧（通常は分野の専門家）。双方向のコミュニケーションを行った相手}"
+informed: "{進捗を共有する全員の一覧。一方向のコミュニケーションを行う相手}"
 ---
 
 # {解決した問題と採用した解決策を表す短いタイトル}
