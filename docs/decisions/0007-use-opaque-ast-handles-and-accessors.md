@@ -16,7 +16,9 @@ libmarkdown は利用者が観察および編集できる公開 AST を提供す
 
 Chosen option: "不透明な AST ハンドルとアクセサ API を使用する", because 利用者がノード種別、属性および木構造を観察し、検証済みの操作で編集できる一方、内部表現の変更と不変条件の維持を両立できるため。
 
-公開ヘッダは `md_node_t` および `md_markdown_t` を不完全型として宣言する。document root と構築用 fragment の双方を `md_node_t` で表し、利用者は、ノード種別、親、子、兄弟、テキストおよびノード固有属性をアクセサ API で取得する。`md_node_create(MD_NODE_DOCUMENT, ...)` で document root を生成し、その他のノードは document root を指定して生成する。生成、属性変更、子の追加、切り離しおよび破棄は、公開された検証付き API だけで行う。公開 API は可変なノード内部フィールドへのポインタを返さない。
+公開ヘッダは `md_node_t` および `md_markdown_t` を不完全型として宣言する。document root と構築用 fragment の双方を `md_node_t` で表し、利用者は、ノード種別、親、子、兄弟、テキストおよびノード固有属性をアクセサ API で取得する。
+
+生成、属性変更、子の追加、切り離しおよび破棄は、公開された検証付き API だけで行う。公開 API は可変なノード内部フィールドへのポインタを返さない。
 
 ### Consequences
 
