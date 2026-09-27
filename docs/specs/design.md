@@ -107,7 +107,7 @@ AST は次の固定ノード種別を使用する。公開 API における列�
 | インライン | `link` | リンク先、タイトル |
 | インライン | `image` | リンク先、タイトル、alt の inline 子ノード |
 
-`list` の種別は bullet または ordered とする。bullet リストの開始番号および区切り文字は持たず、`delimiter` は `MD_LIST_DELIMITER_NONE` とする。ordered リストの開始番号は 1 以上、区切り文字は period または paren とする。bullet リストに `MD_LIST_DELIMITER_NONE` 以外の delimiter を設定する操作は `MD_INVALID_AST` で失敗する。
+`list` の種別は bullet または ordered とする。bullet リストの開始番号および区切り文字は持たず、`delimiter` は `MD_LIST_DELIMITER_NONE` とする。ordered リストの開始番号は `MD_ORDERED_LIST_START_MIN` 以上 `MD_ORDERED_LIST_START_MAX` 以下（1 から 999999999）とし、区切り文字は period または paren とする。範囲外の開始番号を設定する操作は `MD_INVALID_AST` で失敗する。bullet リストに `MD_LIST_DELIMITER_NONE` 以外の delimiter を設定する操作も `MD_INVALID_AST` で失敗する。
 
 `heading` のレベルは 1 から 6 とする。タイトルを持たない `link`、`image` および `reference_definition` は、タイトルを未設定として表現する。`image` の alt は inline 子ノード列で表現し、空 alt は子ノード 0 個で表現する。alt の子には `link` と `image` を置かない。
 
@@ -144,7 +144,7 @@ document は、NULL 終端された最新の Markdown 出力バッファと、�
 
 `md_node_create(type, ...)` が生成する親を持たない通常ノードは、document に未接続の構築用フラグメントであり、最小子数を満たさなくてもよい。フラグメントの document 所属は持たず、フラグメントへ子を追加する操作は、3.2 節の親子関係だけを検査する。
 
-フラグメントまたは接続済み部分木を document へ追加する操作は、追加後の全体が 3.2 節の最小子数、必須属性、単一親、循環なし、共有なしおよび link の祖先制約を満たす場合だけ成功する。失敗時は親子関係と所有権を変更しない。
+フラグメントまたは接続済み部分木を document へ追加する操作は、追加後の全体が 3.2 節の最小子数、必須属性、属性値の範囲、単一親、循環なし、共有なしおよび link の祖先制約を満たす場合だけ成功する。失敗時は親子関係と所有権を変更しない。
 
 接続済みの `list`、`list_item`、`block_quote`、`paragraph`、`emphasis` または `strong` から最後の子を切り離す操作は `MD_INVALID_AST` で失敗し、子は親の所有のままとする。これらのコンテナ全体を親から切り離す操作は許可する。
 
@@ -220,7 +220,7 @@ flowchart TD
 
 シリアライザは常に LF を使用し、ブロック間を空行一つで区切る。
 
-見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番の `.` 区切りで出力する。tight list では list item 間および item 内のブロック間に空行を出力せず、loose list では各 list item のブロック境界を空行で区切る。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
+見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番の `.` 区切りで出力する。ordered list の開始番号は `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` までの値だけを出力し、9 桁を超える値を別の記法へ変換しない。tight list では list item 間および item 内のブロック間に空行を出力せず、loose list では各 list item のブロック境界を空行で区切る。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
 
 リンクと画像は常にインライン形式で出力する。`link` は子の inline 正規形を角括弧で囲み、`image` は `!`、alt 子ノードの正規形、destination および任意の title を用いて出力する。空 alt は `![](...)` とする。alt の出力は image label 文脈として扱い、閉じ角括弧、開き角括弧、emphasis、code、HTML およびバックスラッシュの開始に使われる文字を、再解析時に子ノード境界が変わらないようエスケープする。`reference_definition` は AST 上の位置で、正規化済みラベル、リンク先およびタイトルから参照定義として出力する。参照定義の順序は AST の子順序に従い、参照定義の追加、削除、移動または属性変更は既存の `link` と `image` の解決済み属性を変更しない。
 
@@ -266,9 +266,9 @@ CMake の configure、build および test は、Node.js、ネットワークま
 
 ラウンドトリップテストは、Markdown を解析し、シリアライズ後に再解析して AST 正規形を比較する。AST 正規形にはノード種別、子ノード順序、意味属性およびテキスト内容を含める。ソース位置、入力時の記法および正規化された改行形式は含めない。
 
-API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、list delimiter の kind 別制約、tight list への子追加による loose 自動更新、image の alt 子ノード編集と不正な link/image 子の拒否、解析後の reference_definition 編集が既存 link/image を再解決しないこと、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネスト、document 所有出力の寿命、再シリアライズ時の旧ポインタ無効化および複数出力の同時保持不可を対象とする。
+API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、list delimiter の kind 別制約、ordered list の開始番号について `MD_ORDERED_LIST_START_MIN` と `MD_ORDERED_LIST_START_MAX` の成功および境界外値の拒否、tight list への子追加による loose 自動更新、image の alt 子ノード編集と不正な link/image 子の拒否、解析後の reference_definition 編集が既存 link/image を再解決しないこと、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネスト、document 所有出力の寿命、再シリアライズ時の旧ポインタ無効化および複数出力の同時保持不可を対象とする。
 
-シリアライザの境界テストは、bullet list の delimiter 不正値、tight/loose list の空行、内容中の backtick/tilde run、info string の backtick、文脈別の括弧・引用符・バックスラッシュ・構文開始文字、空 destination、改行を含む title、空 alt、inline 構造を含む alt、alt 内の括弧・角括弧・バックスラッシュ、および inline link/image の再解析結果を対象とする。
+シリアライザの境界テストは、ordered list の開始番号 `MD_ORDERED_LIST_START_MIN` および `MD_ORDERED_LIST_START_MAX` の round-trip、範囲外 start の拒否、bullet list の delimiter 不正値、tight/loose list の空行、内容中の backtick/tilde run、info string の backtick、文脈別の括弧・引用符・バックスラッシュ・構文開始文字、空 destination、改行を含む title、空 alt、inline 構造を含む alt、alt 内の括弧・角括弧・バックスラッシュ、および inline link/image の再解析結果を対象とする。
 
 さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび document 所有出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。document 破棄後に出力ポインタを参照しないこと、失敗後に再シリアライズできることも検証する。
 

@@ -98,6 +98,8 @@ typedef struct md_allocator
 } md_allocator_t;
 
 #define MD_OFFSET_NONE ((size_t)-1)
+#define MD_ORDERED_LIST_START_MIN 1UL
+#define MD_ORDERED_LIST_START_MAX 999999999UL
 ```
 
 ## DESCRIPTION
@@ -106,7 +108,7 @@ typedef struct md_allocator
 
 `md_node_type_t` は document、ブロックおよびインラインの固定ノード種別を表す。`MD_NODE_IMAGE` は destination、任意の title および alt を表す inline 子ノード列を持つ。空 alt は子ノード 0 個で表現する。未知のノード種別は生成、編集およびシリアライズで拒否する。
 
-`md_list_kind_t` と `md_list_delimiter_t` は list ノードの種別と区切り文字を表す。bullet list の delimiter は `MD_LIST_DELIMITER_NONE` 固定であり、ordered list は `MD_LIST_DELIMITER_PERIOD` または `MD_LIST_DELIMITER_PAREN` を使用する。`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ。3つのコールバックはすべて非 NULL でなければならない。
+`md_list_kind_t` と `md_list_delimiter_t` は list ノードの種別と区切り文字を表す。bullet list の delimiter は `MD_LIST_DELIMITER_NONE` 固定であり、ordered list は `MD_LIST_DELIMITER_PERIOD` または `MD_LIST_DELIMITER_PAREN` を使用する。ordered list の start は `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` の範囲に限る。この上限は CommonMark の ordered-list marker を 9 桁以内で出力し、シリアライズ後の再解析で開始番号を保持するために設ける。`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ。3つのコールバックはすべて非 NULL でなければならない。
 
 ## STATUS
 
