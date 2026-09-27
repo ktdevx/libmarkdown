@@ -23,7 +23,7 @@ Markdown の準拠対象は CommonMark Spec 0.31.2 とする。
 5. AST 検証: ノード種別、必須属性、親子関係および木構造の不変条件を検査する。UTF-8 の妥当性は検査しない。
 6. Markdown シリアライズ: 有効な AST から意味的に等価な UTF-8 Markdown を構築する。
 
-解析は入力検証、ブロック解析、インライン解析、AST 構築の順に処理する。シリアライズは AST 検証が成功した場合にだけ出力バッファを構築する。いずれの処理も失敗時に成功結果を返さない。
+解析は入力検証、ブロック解析、インライン解析、AST 構築の順に処理する。シリアライズは AST 検証が成功した場合にだけ一時バッファを構築し、生成に成功した場合だけ document が所有する出力バッファと交換する。いずれの処理も失敗時に部分的な結果を成功結果として返さない。
 
 処理の流れを次に示す。
 
@@ -81,7 +81,7 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 すべてのテキスト属性と属性値は有効な UTF-8 であることを呼び出し側が保証する。ライブラリは UTF-8 の妥当性を検証、正規化または補正しない。この前提に違反する入力を渡した場合の解析結果、シリアライズ結果、診断および文字化けは保証しない。対応しないノード種別、不正な属性、不正な親子関係、循環または共有を含む AST は無効とする。
 
-公開ヘッダは `md_node_t` および `md_markdown_t` を不完全型として宣言する。document も `MD_NODE_DOCUMENT` を持つ `md_node_t` で表す。
+公開ヘッダは `md_node_t` を不完全型として宣言する。document も `MD_NODE_DOCUMENT` を持つ `md_node_t` で表し、シリアライズ結果は document 内部の動的バッファで保持する。
 
 利用者はアクセサ API でノード種別、親、子、兄弟、テキストおよびノード固有属性を取得する。利用者はノード内部の可変フィールドへ直接アクセスせず、生成、属性変更、子の追加、切り離しおよび破棄の各 API を通じて編集する。
 
@@ -139,6 +139,8 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 `document`、`block_quote` および `list_item` の子に `reference_definition` を置ける。
 
 `reference_definition` は属性だけを持つ葉ノードである。`link` の子孫に `link` を置くことはできない。
+
+document は、NULL 終端された最新の Markdown 出力バッファと、その容量および未生成状態を内部に保持する。出力バッファは AST の意味属性ではなく document の派生状態であり、利用者はその内部フィールドへ直接アクセスしない。
 
 ### 3.3 構築、編集および構造的不変条件
 
@@ -247,6 +249,8 @@ flowchart TD
 
 `malloc` または `realloc` の失敗は NULL で表し、`realloc` の失敗時は元のポインタを変更しない。`free(NULL)` は何もしない。サイズ0の扱いと必要なアラインメントは、使用するコールバックが標準Cの対応する契約を満たすものとする。
 
+前項の Markdown 出力は独立した出力オブジェクトではなく、document が所有する内部バッファを指す。document の破棄時にそのバッファも解放するため、利用者は出力ポインタを解放してはならない。
+
 グローバルアロケータ契約は、document、関連する全ノードおよびその document から生成する Markdown 出力に操作時点で適用する。
 
 グローバルアロケータの適用範囲を次に示す。
@@ -271,19 +275,16 @@ flowchart TB
 | `md_node_insert_before` | 親、未接続の子、挿入位置 | 成功時に親へ所有権を移し、child を親の document に接続する。`before` が NULL の場合は末尾へ追加する。失敗時は子の未接続状態と所有権を利用者に残す。 |
 | `md_node_detach` | 接続済みノード、node 出力 | 成功時に利用者へ所有権を移す。最後の必須子の切り離しは失敗する。 |
 | `md_node_destroy` | 切り離しノードまたは document root | 切り離しノードとその子孫、または document root と接続済みの木を破棄する。接続済みの通常ノードは拒否し、document root の破棄では切り離しフラグメントを保持する。 |
-| `md_serialize` | document root、Markdown 出力 | 成功時に `md_markdown_t` の所有権を利用者へ渡す。document root 以外は拒否し、失敗時に出力を返さない。 |
-| `md_markdown_data` | `md_markdown_t` | NULL 終端された出力文字列を読み取り専用で返す。 |
-| `md_markdown_destroy` | `md_markdown_t` | 操作時点のグローバルアロケータ契約で出力を破棄する。 |
+| `md_serialize` | document root、出力ポインタ | document 内部の最新出力を更新し、成功時に読み取り専用ポインタを返す。document root 以外は拒否する。呼び出し前に取得した出力ポインタは、成功または失敗にかかわらず呼び出し後に参照してはならない。 |
 
-利用者はライブラリが提供する専用の破棄操作で AST および `md_markdown_t` を解放する。利用者がライブラリ所有のメモリを標準の `free()` などで直接解放してはならない。
+document の破棄は、接続済みの AST とともに内部の Markdown 出力バッファを解放する。利用者は出力バッファを解放してはならず、document の破棄後に出力ポインタを参照してはならない。
 
 ### 5.1 公開ヘッダ契約
 
-公開ヘッダは `<stddef.h>` を含み、`md_node_t` および `md_markdown_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならない。
+公開ヘッダは `<stddef.h>` を含み、`md_node_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならない。
 
 ```c
 typedef struct md_node md_node_t;
-typedef struct md_markdown md_markdown_t;
 
 typedef enum md_status {
 	MD_OK,
@@ -390,11 +391,9 @@ md_status_t md_reference_definition_set_attributes(
 	const char *title, int has_title,
 	md_diagnostic_t *diagnostic);
 
-md_status_t md_serialize(const md_node_t *document,
-					   md_markdown_t **out_markdown,
+md_status_t md_serialize(md_node_t *document,
+					   const char **out_data,
 					   md_diagnostic_t *diagnostic);
-const char *md_markdown_data(const md_markdown_t *markdown);
-void md_markdown_destroy(md_markdown_t *markdown);
 ```
 
 `md_node_insert_before()` の `before` が NULL の場合、child を最後の子として追加する。`before` が指定された場合は parent の直接の子でなければならない。`md_node_create(MD_NODE_DOCUMENT, ...)` は document root を生成する。その他のノード種別では document に未接続の fragment を生成する。未接続の fragment は、許可された親子関係を満たす任意の親へ接続でき、接続成功時に親の所有下へ入る。親が document に接続済みの場合は child もその document に接続される。document root は `md_node_destroy()` で破棄できるが、切り離しおよび子としての追加はできない。
@@ -404,6 +403,10 @@ void md_markdown_destroy(md_markdown_t *markdown);
 ## 6. シリアライズ契約
 
 シリアライザは有効な AST だけを入力として受け付ける。無効な AST では、診断可能な失敗を返し、AST を変更せず、部分的な出力を成功結果として返してはならない。
+
+`md_serialize()` は document 内部の出力バッファとは別の一時バッファへ Markdown 全体を構築する。AST 検証、シリアライズおよび終端処理が成功した場合だけ、一時バッファを document の出力バッファと交換し、`out_data` にその NULL 終端文字列への読み取り専用ポインタを設定する。確保または再確保に失敗した場合は document の AST と出力バッファを部分的な結果へ変更せず、失敗を返す。
+
+`out_data` が指す文字列は document が所有し、document の破棄時に解放する。`md_serialize()` の次回呼び出し後は、呼び出し前に取得した出力ポインタを参照してはならない。これは再確保によるアドレス変更の有無にかかわらず適用する。シリアライズ結果を複数世代にわたって保持することはできない。
 
 成功したシリアライズ結果を再解析した AST は、ノード種別、子ノード順序、意味属性およびテキスト内容について入力 AST と意味的に等価とする。ソース位置、入力時の記法選択、改行形式、および記法上のみ必要な空白は保持対象としない。
 
@@ -455,13 +458,13 @@ CMake の configure、build および test は、Node.js、ネットワークま
 
 `src/internal/ast_test_hooks.c` は `LIBMARKDOWN_TESTING` が定義されたテスト用ターゲットだけにリンクする。循環、共有ノード、不正親子関係、必須属性欠落および不正な list 属性を構築できる。
 
-出荷ライブラリのターゲットは `ast_test_hooks.c` と `tests/support` を含めてはならない。各無効 AST フィクスチャは `md_serialize()` が `MD_INVALID_AST` を返し、出力ハンドルを返さず、入力 AST を変更しないことを検証する。
+出荷ライブラリのターゲットは `ast_test_hooks.c` と `tests/support` を含めてはならない。各無効 AST フィクスチャは `md_serialize()` が `MD_INVALID_AST` を返し、`out_data` を成功結果へ変更せず、入力 AST と document の出力バッファを部分的な結果へ変更しないことを検証する。
 
 ラウンドトリップテストは、Markdown を解析し、シリアライズ後に再解析して AST 正規形を比較する。AST 正規形にはノード種別、子ノード順序、意味属性およびテキスト内容を含める。ソース位置、入力時の記法および正規化された改行形式は含めない。
 
-API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネストを対象とする。
+API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネスト、document 所有出力の寿命、再シリアライズ時の旧ポインタ無効化および複数出力の同時保持不可を対象とする。
 
-さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。
+さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび document 所有出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。document 破棄後に出力ポインタを参照しないこと、失敗後に再シリアライズできることも検証する。
 
 ## 8. 要件トレーサビリティ
 
