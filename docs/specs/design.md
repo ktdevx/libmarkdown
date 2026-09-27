@@ -220,7 +220,7 @@ flowchart TD
 
 シリアライザは常に LF を使用し、ブロック間を空行一つで区切る。
 
-見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番の `.` 区切りで出力する。ordered list の開始番号は `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` までの値だけを出力し、9 桁を超える値を別の記法へ変換しない。tight list では list item 間および item 内のブロック間に空行を出力せず、loose list では各 list item のブロック境界を空行で区切る。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
+見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番とし、いずれも list の delimiter を使って出力する。ordered list の開始番号は `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` までの値だけを出力し、9 桁を超える値を別の記法へ変換しない。tight list では list item 間および item 内のブロック間に空行を出力せず、loose list では各 list item のブロック境界を空行で区切る。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
 
 リンクと画像は常にインライン形式で出力する。`link` は子の inline 正規形を角括弧で囲み、`image` は `!`、alt 子ノードの正規形、destination および任意の title を用いて出力する。空 alt は `![](...)` とする。alt の出力は image label 文脈として扱い、閉じ角括弧、開き角括弧、emphasis、code、HTML およびバックスラッシュの開始に使われる文字を、再解析時に子ノード境界が変わらないようエスケープする。`reference_definition` は AST 上の位置で、正規化済みラベル、リンク先およびタイトルから参照定義として出力する。参照定義の順序は AST の子順序に従い、参照定義の追加、削除、移動または属性変更は既存の `link` と `image` の解決済み属性を変更しない。
 
