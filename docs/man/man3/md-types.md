@@ -104,7 +104,7 @@ typedef struct md_allocator
 
 `md_node_t` は不透明な AST ノード型である。利用者は内部フィールドへ直接アクセスせず、公開 API を通じてノードを操作する。
 
-`md_node_type_t` は document、ブロックおよびインラインの固定ノード種別を表す。未知のノード種別は生成、編集およびシリアライズで拒否する。
+`md_node_type_t` は document、ブロックおよびインラインの固定ノード種別を表す。`MD_NODE_IMAGE` は destination、任意の title および alt を表す inline 子ノード列を持つ。空 alt は子ノード 0 個で表現する。未知のノード種別は生成、編集およびシリアライズで拒否する。
 
 `md_list_kind_t` と `md_list_delimiter_t` は list ノードの種別と区切り文字を表す。bullet list の delimiter は `MD_LIST_DELIMITER_NONE` 固定であり、ordered list は `MD_LIST_DELIMITER_PERIOD` または `MD_LIST_DELIMITER_PAREN` を使用する。`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ。3つのコールバックはすべて非 NULL でなければならない。
 

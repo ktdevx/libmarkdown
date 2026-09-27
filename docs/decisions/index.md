@@ -20,3 +20,4 @@
 - 0017: [アロケータ設定変更時の責任境界を定義する](0017-define-allocator-change-responsibility.md)
 - 0018: [list delimiter の kind 別契約を定義する](0018-define-list-delimiter-contract.md)
 - 0019: [解析済み参照リンクの編集後挙動を固定する](0019-define-reference-editing-semantics.md)
+- 0020: [image の alt を inline 子ノードとして表現する](0020-define-image-alt-representation.md)

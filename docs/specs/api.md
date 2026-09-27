@@ -34,7 +34,7 @@
 | [md-node-lifecycle(3)](../man/man3/md-node-lifecycle.md) | AST ノードの生成と破棄。 |
 | [md-node-edit(3)](../man/man3/md-node-edit.md) | 親子関係の接続と切り離し。 |
 | [md-node-traverse(3)](../man/man3/md-node-traverse.md) | ノード種別、親子、兄弟および literal の取得。 |
-| [md-node-attributes(3)](../man/man3/md-node-attributes.md) | literal、heading、list、link、参照定義の属性操作。 |
+| [md-node-attributes(3)](../man/man3/md-node-attributes.md) | literal、heading、list、link、image、参照定義の属性操作。 |
 
 ## 5. 文書の責務
 
