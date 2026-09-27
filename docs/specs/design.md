@@ -197,7 +197,7 @@ AST 正規形は、各ノードを深さ優先・子の順序どおりに表現�
 
 失敗可能な公開 API は `md_status_t` を返す。状態コードは少なくとも、不正引数、メモリ不足、不変条件違反および未対応機能を区別する。
 
-呼び出し側が `md_diagnostic_t` を指定した場合、ライブラリは各呼び出しの結果で診断内容を上書きする。
+呼び出し側が `md_diag_t` を指定した場合、ライブラリは各呼び出しの結果で診断内容を上書きする。
 
 診断には状態コード、処理段階、入力位置またはノードに関する位置情報、および補足情報を格納する。診断オブジェクトは呼び出し側が所有し、ライブラリは操作後に参照を保持しない。
 
@@ -213,7 +213,7 @@ flowchart TD
 	Execute -->|メモリ不足| MemoryError[MD_OUT_OF_MEMORY]
 	Execute -->|AST 不正| AstError[MD_INVALID_AST]
 	Execute -->|成功| Success[MD_OK]
-	ArgumentError --> Diagnostic[任意の md_diagnostic_t]
+	ArgumentError --> Diagnostic[任意の md_diag_t]
 	MemoryError --> Diagnostic
 	AstError --> Diagnostic
 ```
@@ -231,7 +231,7 @@ flowchart TD
 
 ### 4.2 診断オブジェクト
 
-`md_diagnostic_t` は動的メモリを所有しない公開構造体とする。少なくとも `status`、`phase`、`input_offset`、`node_type` および `detail` を持つ。
+`md_diag_t` は動的メモリを所有しない公開構造体とする。少なくとも `status`、`phase`、`input_offset`、`node_type` および `detail` を持つ。
 
 `phase` は argument、allocation、parse_block、parse_inline、ast_edit、ast_validate または serialize を表す列挙値とする。位置情報を持たない失敗の `input_offset` は `MD_OFFSET_NONE`、ノードに関係しない失敗の `node_type` は `MD_NODE_NONE` とする。
 
@@ -241,7 +241,7 @@ flowchart TD
 
 `md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ公開構造体とする。
 
-`md_allocator_configure()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。document root の生成を行う `md_node_create(MD_NODE_DOCUMENT, ...)` と `md_parse()` は現在のグローバルアロケータを参照する。
+`md_allocator_config()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。document root の生成を行う `md_node_create(MD_NODE_DOCUMENT, ...)` と `md_parse()` は現在のグローバルアロケータを参照する。
 
 設定変更は既存の document、関連する全ノードおよびその document から生成した Markdown 出力にも適用される。利用者は設定変更と document 操作を同期し、設定変更前に確保されたメモリを新しいアロケータで正しく扱えることを保証する。
 
@@ -257,7 +257,7 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-	Configure[md_allocator_configure] --> Global[グローバルアロケータ]
+	Configure[md_allocator_config] --> Global[グローバルアロケータ]
 	Global --> Document[document]
 	Global --> Nodes[ノード]
 	Global --> Fragment[切り離しフラグメント]
@@ -269,7 +269,7 @@ flowchart TB
 
 | 操作 | 入力と出力 | 所有権・失敗時契約 |
 | --- | --- | --- |
-| `md_allocator_configure` | 既定アロケータ | 全 document の以後の操作が参照するグローバル契約を設定する。既存の document にも影響する。 |
+| `md_allocator_config` | 既定アロケータ | 全 document の以後の操作が参照するグローバル契約を設定する。既存の document にも影響する。 |
 | `md_parse` | UTF-8 Markdown、document root 出力 | 操作時点のグローバルアロケータを参照し、成功時に `MD_NODE_DOCUMENT` root の所有権を渡す。失敗時は document root を返さない。 |
 | `md_node_create` | ノード種別、node 出力 | `MD_NODE_DOCUMENT` では document root を、それ以外では document に未接続の fragment を利用者へ渡す。 |
 | `md_node_insert_before` | 親、未接続の子、挿入位置 | 成功時に親へ所有権を移し、child を親の document に接続する。`before` が NULL の場合は末尾へ追加する。失敗時は子の未接続状態と所有権を利用者に残す。 |
@@ -286,127 +286,180 @@ document の破棄は、接続済みの AST とともに内部の Markdown 出�
 ```c
 typedef struct md_node md_node_t;
 
-typedef enum md_status {
-	MD_OK,
-	MD_INVALID_ARGUMENT,
-	MD_OUT_OF_MEMORY,
-	MD_INVALID_AST,
-	MD_UNSUPPORTED_NODE,
-	MD_INTERNAL_ERROR
+typedef enum md_status
+{
+    MD_OK,
+    MD_INVALID_ARGUMENT,
+    MD_OUT_OF_MEMORY,
+    MD_INVALID_AST,
+    MD_UNSUPPORTED_NODE,
+    MD_INTERNAL_ERROR
 } md_status_t;
 
-typedef enum md_node_type {
-	MD_NODE_NONE,
-	MD_NODE_DOCUMENT, MD_NODE_BLOCK_QUOTE, MD_NODE_LIST, MD_NODE_LIST_ITEM,
-	MD_NODE_CODE_BLOCK, MD_NODE_HTML_BLOCK, MD_NODE_PARAGRAPH, MD_NODE_HEADING,
-	MD_NODE_THEMATIC_BREAK, MD_NODE_REFERENCE_DEFINITION, MD_NODE_TEXT,
-	MD_NODE_SOFT_BREAK, MD_NODE_HARD_BREAK, MD_NODE_CODE, MD_NODE_HTML_INLINE,
-	MD_NODE_EMPHASIS, MD_NODE_STRONG, MD_NODE_LINK, MD_NODE_IMAGE
+typedef enum md_node_type
+{
+    MD_NODE_NONE,
+    MD_NODE_DOCUMENT,
+    MD_NODE_BLOCK_QUOTE,
+    MD_NODE_LIST,
+    MD_NODE_LIST_ITEM,
+    MD_NODE_CODE_BLOCK,
+    MD_NODE_HTML_BLOCK,
+    MD_NODE_PARAGRAPH,
+    MD_NODE_HEADING,
+    MD_NODE_THEMATIC_BREAK,
+    MD_NODE_REFERENCE_DEFINITION,
+    MD_NODE_TEXT,
+    MD_NODE_SOFT_BREAK,
+    MD_NODE_HARD_BREAK,
+    MD_NODE_CODE,
+    MD_NODE_HTML_INLINE,
+    MD_NODE_EMPHASIS,
+    MD_NODE_STRONG,
+    MD_NODE_LINK,
+    MD_NODE_IMAGE
 } md_node_type_t;
 
-typedef enum md_list_kind { MD_LIST_BULLET, MD_LIST_ORDERED } md_list_kind_t;
-typedef enum md_list_delimiter {
-	MD_LIST_DELIMITER_NONE, MD_LIST_DELIMITER_PERIOD, MD_LIST_DELIMITER_PAREN
+typedef enum md_list_kind
+{
+    MD_LIST_BULLET,
+    MD_LIST_ORDERED
+} md_list_kind_t;
+
+typedef enum md_list_delimiter
+{
+    MD_LIST_DELIMITER_NONE,
+    MD_LIST_DELIMITER_PERIOD,
+    MD_LIST_DELIMITER_PAREN
 } md_list_delimiter_t;
-typedef enum md_phase {
-	MD_PHASE_NONE, MD_PHASE_ARGUMENT, MD_PHASE_ALLOCATION, MD_PHASE_PARSE_BLOCK,
-	MD_PHASE_PARSE_INLINE, MD_PHASE_AST_EDIT, MD_PHASE_AST_VALIDATE, MD_PHASE_SERIALIZE
+
+typedef enum md_phase
+{
+    MD_PHASE_NONE,
+    MD_PHASE_ARGUMENT,
+    MD_PHASE_ALLOCATION,
+    MD_PHASE_PARSE_BLOCK,
+    MD_PHASE_PARSE_INLINE,
+    MD_PHASE_AST_EDIT,
+    MD_PHASE_AST_VALIDATE,
+    MD_PHASE_SERIALIZE
 } md_phase_t;
-typedef enum md_diagnostic_detail {
-	MD_DETAIL_NONE, MD_DETAIL_PARENT_ALREADY_SET, MD_DETAIL_INVALID_CHILD_TYPE,
-	MD_DETAIL_REQUIRED_ATTRIBUTE_MISSING, MD_DETAIL_ATTRIBUTE_OUT_OF_RANGE,
-	MD_DETAIL_CYCLE_DETECTED, MD_DETAIL_SHARED_NODE
-} md_diagnostic_detail_t;
 
-typedef struct md_diagnostic {
-	md_status_t status;
-	md_phase_t phase;
-	size_t input_offset;
-	md_node_type_t node_type;
-	md_diagnostic_detail_t detail;
-} md_diagnostic_t;
+typedef enum md_diag_detail
+{
+    MD_DETAIL_NONE,
+    MD_DETAIL_PARENT_ALREADY_SET,
+    MD_DETAIL_INVALID_CHILD_TYPE,
+    MD_DETAIL_REQUIRED_ATTRIBUTE_MISSING,
+    MD_DETAIL_ATTRIBUTE_OUT_OF_RANGE,
+    MD_DETAIL_CYCLE_DETECTED,
+    MD_DETAIL_SHARED_NODE
+} md_diag_detail_t;
 
-typedef struct md_allocator {
-	void *(*malloc)(size_t size);
-	void (*free)(void *pointer);
-	void *(*realloc)(void *pointer, size_t size);
+typedef struct md_diag
+{
+    md_status_t status;
+    md_phase_t phase;
+    size_t input_offset;
+    md_node_type_t node_type;
+    md_diag_detail_t detail;
+} md_diag_t;
+
+typedef struct md_allocator
+{
+    void *(*malloc)(size_t size);
+    void (*free)(void *ptr);
+    void *(*realloc)(void *ptr, size_t size);
 } md_allocator_t;
 
 #define MD_OFFSET_NONE ((size_t)-1)
 ```
 
-失敗可能な操作は `md_status_t` を返す。`out_*` 引数は必須で、失敗時にライブラリはその値を変更しない。
+失敗可能な操作は `md_status_t` を返す。
 
-`diagnostic` は NULL を許可する。公開 API の必須文字列引数は NULL 終端された非 NULL ポインタで指定し、空文字列は `""` で表す。任意属性の文字列だけは、対応する存在フラグが false の場合に NULL を許可する。文字列には埋め込み NULL を許可せず、出力文字列は NULL 終端する。`size_t` は文字列長ではなく、allocator のサイズや診断の入力オフセットなど、別の用途に引き続き使用する。
+`diag` は NULL を許可する。公開 API の必須文字列引数は NULL 終端された非 NULL ポインタで指定し、空文字列は `""` で表す。任意属性の文字列だけは、対応する存在フラグが false の場合に NULL を許可する。文字列には埋め込み NULL を許可せず、出力文字列は NULL 終端する。`size_t` は文字列長ではなく、allocator のサイズや診断の入力オフセットなど、別の用途に引き続き使用する。
 
 ```c
-md_status_t md_allocator_configure(const md_allocator_t *allocator,
-								 md_diagnostic_t *diagnostic);
-md_status_t md_parse(const char *markdown,
-								 md_node_t **out_document,
-				   md_diagnostic_t *diagnostic);
+md_status_t md_allocator_config(const md_allocator_t *allocator,
+    md_diag_t *diag);
 
-md_node_type_t md_node_type_of(const md_node_t *node);
-const md_node_t *md_node_parent(const md_node_t *node);
-const md_node_t *md_node_first_child(const md_node_t *node);
-const md_node_t *md_node_next_sibling(const md_node_t *node);
-md_status_t md_node_get_literal(const md_node_t *node, const char **out_value,
-							  md_diagnostic_t *diagnostic);
-md_status_t md_heading_get_level(const md_node_t *node, unsigned int *out_level,
-							   md_diagnostic_t *diagnostic);
-md_status_t md_list_get_attributes(const md_node_t *node, md_list_kind_t *out_kind,
-								 unsigned long *out_start,
-								 md_list_delimiter_t *out_delimiter, int *out_tight,
-								 md_diagnostic_t *diagnostic);
-md_status_t md_link_get_attributes(const md_node_t *node, const char **out_destination,
-								 const char **out_title, int *out_has_title,
-								 md_diagnostic_t *diagnostic);
-md_status_t md_reference_definition_get_attributes(
-	const md_node_t *node, const char **out_label,
-	const char **out_destination, const char **out_title, int *out_has_title,
-	md_diagnostic_t *diagnostic);
+md_status_t md_parse(const char *str, md_node_t **node, md_diag_t *diag);
 
-md_status_t md_node_create(md_node_type_t type,
-						 md_node_t **out_node, md_diagnostic_t *diagnostic);
-md_status_t md_node_insert_before(md_node_t *parent, md_node_t *child,
-								const md_node_t *before,
-								md_diagnostic_t *diagnostic);
+md_status_t md_node_get_type(const md_node_t *node, md_node_type_t *type,
+    md_diag_t *diag);
+
+md_status_t md_node_get_parent(const md_node_t *node, const md_node_t **parent,
+    md_diag_t *diag);
+
+md_status_t md_node_get_first_child(const md_node_t *node,
+    const md_node_t **first_child, md_diag_t *diag);
+
+md_status_t md_node_get_next_sibling(const md_node_t *node,
+    const md_node_t **next_sibling, md_diag_t *diag);
+
+md_status_t md_node_get_literal(const md_node_t *node, const char **value,
+    md_diag_t *diag);
+
+md_status_t md_heading_get_level(const md_node_t *node, unsigned int *level,
+    md_diag_t *diag);
+
+md_status_t md_list_get_attributes(const md_node_t *node, md_list_kind_t *kind,
+    unsigned long *start, md_list_delimiter_t *delimiter, int *tight,
+    md_diag_t *diag);
+	
+md_status_t md_link_get_attributes(const md_node_t *node,
+    const char **destination, const char **title, int *has_title,
+    md_diag_t *diag);
+
+md_status_t md_reference_definition_get_attributes(const md_node_t *node,
+    const char **label, const char **destination, const char **title,
+    int *has_title, md_diag_t *diag);
+
+md_status_t md_node_create( md_node_type_t type, md_node_t **node,
+    md_diag_t *diag);
+
+md_status_t md_node_insert_before( md_node_t *parent,
+    md_node_t *child, const md_node_t *before, md_diag_t *diag);
+
 md_status_t md_node_detach(md_node_t *node, md_node_t **out_node,
-						 md_diagnostic_t *diagnostic);
-md_status_t md_node_destroy(md_node_t *node, md_diagnostic_t *diagnostic);
+    md_diag_t *diag);
+
+md_status_t md_node_destroy(md_node_t *node, md_diag_t *diag);
 
 md_status_t md_node_set_literal(md_node_t *node, const char *value,
-							  md_diagnostic_t *diagnostic);
-md_status_t md_heading_set_level(md_node_t *node, unsigned int level,
-							   md_diagnostic_t *diagnostic);
-md_status_t md_list_set_attributes(md_node_t *node, md_list_kind_t kind,
-								 unsigned long start, md_list_delimiter_t delimiter,
-								 md_diagnostic_t *diagnostic);
-md_status_t md_list_set_tight(md_node_t *node, int tight, md_diagnostic_t *diagnostic);
-md_status_t md_link_set_attributes(md_node_t *node, const char *destination,
-								 const char *title, int has_title,
-								 md_diagnostic_t *diagnostic);
-md_status_t md_reference_definition_set_attributes(
-	md_node_t *node, const char *label, const char *destination,
-	const char *title, int has_title,
-	md_diagnostic_t *diagnostic);
+    md_diag_t *diag);
 
-md_status_t md_serialize(md_node_t *document,
-					   const char **out_data,
-					   md_diagnostic_t *diagnostic);
+md_status_t md_heading_set_level(md_node_t *node, unsigned int level,
+    md_diag_t *diag);
+
+md_status_t md_list_set_attributes(md_node_t *node, md_list_kind_t kind,
+    unsigned long start, md_list_delimiter_t delimiter, md_diag_t *diag);
+
+md_status_t md_list_set_tight(md_node_t *node, int tight, md_diag_t *diag);
+
+md_status_t md_link_set_attributes(md_node_t *node, const char *destination,
+    const char *title, int has_title, md_diag_t *diag);
+
+md_status_t md_reference_definition_set_attributes(md_node_t *node,
+    const char *label, const char *destination, const char *title,
+    int has_title, md_diag_t *diag);
+
+md_status_t md_serialize(md_node_t *node, const char **str, md_diag_t *diag);
 ```
 
 `md_node_insert_before()` の `before` が NULL の場合、child を最後の子として追加する。`before` が指定された場合は parent の直接の子でなければならない。`md_node_create(MD_NODE_DOCUMENT, ...)` は document root を生成する。その他のノード種別では document に未接続の fragment を生成する。未接続の fragment は、許可された親子関係を満たす任意の親へ接続でき、接続成功時に親の所有下へ入る。親が document に接続済みの場合は child もその document に接続される。document root は `md_node_destroy()` で破棄できるが、切り離しおよび子としての追加はできない。
 
-アクセサが返すノード参照は所有権を移さず、そのノードまたは祖先が破棄・切り離し・編集されるまでだけ有効とする。文字列属性アクセサは NULL 終端された読み取り専用ポインタを返し、所有権を移さない。任意属性が未設定の場合は、対応する存在フラグを false とし、文字列ポインタを NULL とする。
+アクセサ API は `md_status_t` を返し、失敗時に診断情報を設定する。入力ノードまたは出力引数が NULL の場合は `MD_INVALID_ARGUMENT` で失敗し、出力引数と AST を変更しない。成功時、ノード種別および参照先を出力引数へ設定する。親、最初の子または次の兄弟が存在しない場合、対応する出力ポインタには NULL を設定する。
+
+アクセサが返すノード参照および文字列属性へのポインタは所有権を移さず、そのノードまたは祖先が破棄・切り離し・編集されるまでだけ有効とする。文字列属性アクセサは NULL 終端された読み取り専用ポインタを返す。任意属性が未設定の場合は、対応する存在フラグを false とし、文字列ポインタを NULL とする。
 
 ## 6. シリアライズ契約
 
 シリアライザは有効な AST だけを入力として受け付ける。無効な AST では、診断可能な失敗を返し、AST を変更せず、部分的な出力を成功結果として返してはならない。
 
-`md_serialize()` は document 内部の出力バッファとは別の一時バッファへ Markdown 全体を構築する。AST 検証、シリアライズおよび終端処理が成功した場合だけ、一時バッファを document の出力バッファと交換し、`out_data` にその NULL 終端文字列への読み取り専用ポインタを設定する。確保または再確保に失敗した場合は document の AST と出力バッファを部分的な結果へ変更せず、失敗を返す。
+`md_serialize()` は document 内部の出力バッファとは別の一時バッファへ Markdown 全体を構築する。AST 検証、シリアライズおよび終端処理が成功した場合だけ、一時バッファを document の出力バッファと交換し、`str` にその NULL 終端文字列への読み取り専用ポインタを設定する。確保または再確保に失敗した場合は document の AST と出力バッファを部分的な結果へ変更せず、失敗を返す。
 
-`out_data` が指す文字列は document が所有し、document の破棄時に解放する。`md_serialize()` の次回呼び出し後は、呼び出し前に取得した出力ポインタを参照してはならない。これは再確保によるアドレス変更の有無にかかわらず適用する。シリアライズ結果を複数世代にわたって保持することはできない。
+`str` が指す文字列は document が所有し、document の破棄時に解放する。`md_serialize()` の次回呼び出し後は、呼び出し前に取得した出力ポインタを参照してはならない。これは再確保によるアドレス変更の有無にかかわらず適用する。シリアライズ結果を複数世代にわたって保持することはできない。
 
 成功したシリアライズ結果を再解析した AST は、ノード種別、子ノード順序、意味属性およびテキスト内容について入力 AST と意味的に等価とする。ソース位置、入力時の記法選択、改行形式、および記法上のみ必要な空白は保持対象としない。
 
@@ -458,7 +511,7 @@ CMake の configure、build および test は、Node.js、ネットワークま
 
 `src/internal/ast_test_hooks.c` は `LIBMARKDOWN_TESTING` が定義されたテスト用ターゲットだけにリンクする。循環、共有ノード、不正親子関係、必須属性欠落および不正な list 属性を構築できる。
 
-出荷ライブラリのターゲットは `ast_test_hooks.c` と `tests/support` を含めてはならない。各無効 AST フィクスチャは `md_serialize()` が `MD_INVALID_AST` を返し、`out_data` を成功結果へ変更せず、入力 AST と document の出力バッファを部分的な結果へ変更しないことを検証する。
+出荷ライブラリのターゲットは `ast_test_hooks.c` と `tests/support` を含めてはならない。各無効 AST フィクスチャは `md_serialize()` が `MD_INVALID_AST` を返し、`str` を成功結果へ変更せず、入力 AST と document の出力バッファを部分的な結果へ変更しないことを検証する。
 
 ラウンドトリップテストは、Markdown を解析し、シリアライズ後に再解析して AST 正規形を比較する。AST 正規形にはノード種別、子ノード順序、意味属性およびテキスト内容を含める。ソース位置、入力時の記法および正規化された改行形式は含めない。
 

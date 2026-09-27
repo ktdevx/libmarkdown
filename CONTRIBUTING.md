@@ -5,6 +5,10 @@
 このリポジトリでは、`main` を常にビルドおよびテスト可能な状態に保ちます。
 変更は短命な作業ブランチで行い、Pull Request（PR）を通して `main` に統合します。
 
+## コーディング規約
+
+C ソースファイルまたは公開ヘッダーファイルを変更する場合は、[C コーディング規約](docs/c-coding-guidelines.md) に従ってください。
+
 ## ブランチ運用
 
 [GitHub Flow](https://docs.github.com/ja/get-started/using-github/github-flow) に従います。
