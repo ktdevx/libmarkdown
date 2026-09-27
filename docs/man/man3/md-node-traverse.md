@@ -28,7 +28,7 @@ md_status_t md_node_get_literal(const md_node_t *node, const char **value, md_di
 
 ## RETURN VALUES
 
-成功時は `MD_OK` を返して出力引数を設定する。入力ノードまたは出力引数が NULL の場合は `MD_INVALID_ARGUMENT` を返し、出力引数と AST を変更しない。
+成功時は `MD_OK` を返して出力引数を設定する。入力ノードまたは出力引数が NULL の場合、または対象ノードが literal を持たない場合は、それぞれ `MD_INVALID_ARGUMENT` または `MD_INVALID_AST` を返し、出力引数と AST を変更しない。
 
 ## OWNERSHIP
 
