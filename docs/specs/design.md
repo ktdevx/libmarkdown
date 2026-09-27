@@ -4,7 +4,7 @@
 
 本書は、libmarkdown の実装に必要な設計を定義する。libmarkdown は、UTF-8 の Markdown 文字列と編集可能な AST を相互変換する C99 ライブラリである。
 
-公開 API の型、関数および列挙型は `md_` 接頭辞を使用し、公開する列挙値、マクロおよび関連する定数は `MD_` 接頭辞を使用する。この規則は将来追加する公開識別子にも適用する。
+公開 API の型、関数、列挙値、マクロおよび操作契約は [公開 C API 設計書](api.md) で定義する。
 
 Markdown の準拠対象は CommonMark Spec 0.31.2 とする。
 
@@ -79,15 +79,11 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 親子関係の追加は、子が親を持たず、追加後の親子関係がノード種別ごとの許可規則を満たす場合だけ成功する。切り離しに成功した子の所有権は利用者に移る。失敗する編集操作は、ノード、親子関係および所有権を変更してはならない。
 
-すべてのテキスト属性と属性値は有効な UTF-8 であることを呼び出し側が保証する。ライブラリは UTF-8 の妥当性を検証、正規化または補正しない。この前提に違反する入力を渡した場合の解析結果、シリアライズ結果、診断および文字化けは保証しない。対応しないノード種別、不正な属性、不正な親子関係、循環または共有を含む AST は無効とする。
-
-公開ヘッダは `md_node_t` を不完全型として宣言する。document も `MD_NODE_DOCUMENT` を持つ `md_node_t` で表し、シリアライズ結果は document 内部の動的バッファで保持する。
-
-利用者はアクセサ API でノード種別、親、子、兄弟、テキストおよびノード固有属性を取得する。利用者はノード内部の可変フィールドへ直接アクセスせず、生成、属性変更、子の追加、切り離しおよび破棄の各 API を通じて編集する。
+対応しないノード種別、不正な属性、不正な親子関係、循環または共有を含む AST は無効とする。文字列の UTF-8 前提、`md_node_t` の不透明性、属性アクセサおよび出力バッファの利用者向け契約は、公開 API の共通規則および各 API リファレンスに従う。
 
 ### 3.1 ノード種別と意味属性
 
-公開 API は次の固定ノード種別を定義する。ノード種別は列挙値で表し、未知の値は生成、編集およびシリアライズで拒否する。
+AST は次の固定ノード種別を使用する。公開 API における列挙値と未知の値の拒否は、公開 API の契約に従う。
 
 | 区分 | ノード種別 | 意味属性 |
 | --- | --- | --- |
@@ -140,7 +136,7 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 `reference_definition` は属性だけを持つ葉ノードである。`link` の子孫に `link` を置くことはできない。
 
-document は、NULL 終端された最新の Markdown 出力バッファと、その容量および未生成状態を内部に保持する。出力バッファは AST の意味属性ではなく document の派生状態であり、利用者はその内部フィールドへ直接アクセスしない。
+document は、NULL 終端された最新の Markdown 出力バッファと、その容量および未生成状態を内部に保持する。出力バッファは AST の意味属性ではなく document の派生状態である。出力バッファの所有権および寿命は、公開 API の契約に従う。
 
 ### 3.3 構築、編集および構造的不変条件
 
@@ -193,273 +189,17 @@ AST 正規形は、各ノードを深さ優先・子の順序どおりに表現�
 
 正規形はソース位置、入力時の記法選択、改行形式、フェンス記号、見出し記法、リストの bullet 記号、および記法上のみ必要な空白を含めない。コード内容、テキスト内容、インデント、ハード改行およびすべての意味属性は含める。
 
-## 4. エラーと診断
+## 4. メモリ管理
 
-失敗可能な公開 API は `md_status_t` を返す。状態コードは少なくとも、不正引数、メモリ不足、不変条件違反および未対応機能を区別する。
+グローバルアロケータ契約と公開操作の所有権・寿命・失敗時契約は、公開 API の契約に従う。
 
-呼び出し側が `md_diag_t` を指定した場合、ライブラリは各呼び出しの結果で診断内容を上書きする。
-
-診断には状態コード、処理段階、入力位置またはノードに関する位置情報、および補足情報を格納する。診断オブジェクトは呼び出し側が所有し、ライブラリは操作後に参照を保持しない。
-
-診断を指定しない場合でも、状態コードにより失敗種別を識別できる。
-
-公開 API の失敗処理の流れを次に示す。
-
-```mermaid
-flowchart TD
-	Call[公開 API 呼び出し] --> Validate[引数検証]
-	Validate -->|失敗| ArgumentError[MD_INVALID_ARGUMENT]
-	Validate --> Execute[処理実行]
-	Execute -->|メモリ不足| MemoryError[MD_OUT_OF_MEMORY]
-	Execute -->|AST 不正| AstError[MD_INVALID_AST]
-	Execute -->|成功| Success[MD_OK]
-	ArgumentError --> Diagnostic[任意の md_diag_t]
-	MemoryError --> Diagnostic
-	AstError --> Diagnostic
-```
-
-### 4.1 状態コード
-
-| 状態コード | 意味 |
-| --- | --- |
-| `MD_OK` | 操作が成功した。 |
-| `MD_INVALID_ARGUMENT` | 必須ポインタ、長さ、列挙値または呼び出し順序が API 契約を満たさない。 |
-| `MD_OUT_OF_MEMORY` | 必要なメモリを確保できない。 |
-| `MD_INVALID_AST` | AST の構造、不変条件または必須属性が要件を満たさない。 |
-| `MD_UNSUPPORTED_NODE` | 対応しないノード種別を生成、編集またはシリアライズしようとした。 |
-| `MD_INTERNAL_ERROR` | 前記以外の回復不能なライブラリ内部エラーが発生した。 |
-
-### 4.2 診断オブジェクト
-
-`md_diag_t` は動的メモリを所有しない公開構造体とする。少なくとも `status`、`phase`、`input_offset`、`node_type` および `detail` を持つ。
-
-`phase` は argument、allocation、parse_block、parse_inline、ast_edit、ast_validate または serialize を表す列挙値とする。位置情報を持たない失敗の `input_offset` は `MD_OFFSET_NONE`、ノードに関係しない失敗の `node_type` は `MD_NODE_NONE` とする。
-
-`detail` は parent_already_set、invalid_child_type、required_attribute_missing、attribute_out_of_range、cycle_detected、shared_node および none を表す列挙値とする。診断の各値は対象操作が返した `md_status_t` と矛盾してはならない。`MD_OK` では `phase` と `detail` を none とする。
-
-## 5. メモリ管理
-
-`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ公開構造体とする。
-
-`md_allocator_config()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。document root の生成を行う `md_node_create(MD_NODE_DOCUMENT, ...)` と `md_parse()` は現在のグローバルアロケータを参照する。
-
-設定変更は既存の document、関連する全ノードおよびその document から生成した Markdown 出力にも適用される。利用者は設定変更と document 操作を同期し、設定変更前に確保されたメモリを新しいアロケータで正しく扱えることを保証する。
-
-設定は3つのコールバックの値をライブラリ内部へコピーして保持する。非 NULL の設定では3つのコールバックをすべて必須とし、いずれかが NULL の場合は `MD_INVALID_ARGUMENT` を返して現在の設定を変更しない。
-
-`malloc` または `realloc` の失敗は NULL で表し、`realloc` の失敗時は元のポインタを変更しない。`free(NULL)` は何もしない。サイズ0の扱いと必要なアラインメントは、使用するコールバックが標準Cの対応する契約を満たすものとする。
-
-前項の Markdown 出力は独立した出力オブジェクトではなく、document が所有する内部バッファを指す。document の破棄時にそのバッファも解放するため、利用者は出力ポインタを解放してはならない。
-
-グローバルアロケータ契約は、document、関連する全ノードおよびその document から生成する Markdown 出力に操作時点で適用する。
-
-グローバルアロケータの適用範囲を次に示す。
-
-```mermaid
-flowchart TB
-	Configure[md_allocator_config] --> Global[グローバルアロケータ]
-	Global --> Document[document]
-	Global --> Nodes[ノード]
-	Global --> Fragment[切り離しフラグメント]
-	Global --> Output[Markdown出力]
-	Change[設定変更] --> Global
-```
-
-公開操作の責務を次のように定める。完全な関数宣言、列挙値および構造体のレイアウトは 5.1 節で定義する。
-
-| 操作 | 入力と出力 | 所有権・失敗時契約 |
-| --- | --- | --- |
-| `md_allocator_config` | 既定アロケータ | 全 document の以後の操作が参照するグローバル契約を設定する。既存の document にも影響する。 |
-| `md_parse` | UTF-8 Markdown、document root 出力 | 操作時点のグローバルアロケータを参照し、成功時に `MD_NODE_DOCUMENT` root の所有権を渡す。失敗時は document root を返さない。 |
-| `md_node_create` | ノード種別、node 出力 | `MD_NODE_DOCUMENT` では document root を、それ以外では document に未接続の fragment を利用者へ渡す。 |
-| `md_node_insert_before` | 親、未接続の子、挿入位置 | 成功時に親へ所有権を移し、child を親の document に接続する。`before` が NULL の場合は末尾へ追加する。失敗時は子の未接続状態と所有権を利用者に残す。 |
-| `md_node_detach` | 接続済みノード、node 出力 | 成功時に利用者へ所有権を移す。最後の必須子の切り離しは失敗する。 |
-| `md_node_destroy` | 切り離しノードまたは document root | 切り離しノードとその子孫、または document root と接続済みの木を破棄する。接続済みの通常ノードは拒否し、document root の破棄では切り離しフラグメントを保持する。 |
-| `md_serialize` | document root、出力ポインタ | document 内部の最新出力を更新し、成功時に読み取り専用ポインタを返す。document root 以外は拒否する。呼び出し前に取得した出力ポインタは、成功または失敗にかかわらず呼び出し後に参照してはならない。 |
-
-document の破棄は、接続済みの AST とともに内部の Markdown 出力バッファを解放する。利用者は出力バッファを解放してはならず、document の破棄後に出力ポインタを参照してはならない。
-
-### 5.1 公開ヘッダ契約
-
-公開ヘッダは `<stddef.h>` を含み、`md_node_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならない。
-
-```c
-typedef struct md_node md_node_t;
-
-typedef enum md_status
-{
-    MD_OK,
-    MD_INVALID_ARGUMENT,
-    MD_OUT_OF_MEMORY,
-    MD_INVALID_AST,
-    MD_UNSUPPORTED_NODE,
-    MD_INTERNAL_ERROR
-} md_status_t;
-
-typedef enum md_node_type
-{
-    MD_NODE_NONE,
-    MD_NODE_DOCUMENT,
-    MD_NODE_BLOCK_QUOTE,
-    MD_NODE_LIST,
-    MD_NODE_LIST_ITEM,
-    MD_NODE_CODE_BLOCK,
-    MD_NODE_HTML_BLOCK,
-    MD_NODE_PARAGRAPH,
-    MD_NODE_HEADING,
-    MD_NODE_THEMATIC_BREAK,
-    MD_NODE_REFERENCE_DEFINITION,
-    MD_NODE_TEXT,
-    MD_NODE_SOFT_BREAK,
-    MD_NODE_HARD_BREAK,
-    MD_NODE_CODE,
-    MD_NODE_HTML_INLINE,
-    MD_NODE_EMPHASIS,
-    MD_NODE_STRONG,
-    MD_NODE_LINK,
-    MD_NODE_IMAGE
-} md_node_type_t;
-
-typedef enum md_list_kind
-{
-    MD_LIST_BULLET,
-    MD_LIST_ORDERED
-} md_list_kind_t;
-
-typedef enum md_list_delimiter
-{
-    MD_LIST_DELIMITER_NONE,
-    MD_LIST_DELIMITER_PERIOD,
-    MD_LIST_DELIMITER_PAREN
-} md_list_delimiter_t;
-
-typedef enum md_phase
-{
-    MD_PHASE_NONE,
-    MD_PHASE_ARGUMENT,
-    MD_PHASE_ALLOCATION,
-    MD_PHASE_PARSE_BLOCK,
-    MD_PHASE_PARSE_INLINE,
-    MD_PHASE_AST_EDIT,
-    MD_PHASE_AST_VALIDATE,
-    MD_PHASE_SERIALIZE
-} md_phase_t;
-
-typedef enum md_diag_detail
-{
-    MD_DETAIL_NONE,
-    MD_DETAIL_PARENT_ALREADY_SET,
-    MD_DETAIL_INVALID_CHILD_TYPE,
-    MD_DETAIL_REQUIRED_ATTRIBUTE_MISSING,
-    MD_DETAIL_ATTRIBUTE_OUT_OF_RANGE,
-    MD_DETAIL_CYCLE_DETECTED,
-    MD_DETAIL_SHARED_NODE
-} md_diag_detail_t;
-
-typedef struct md_diag
-{
-    md_status_t status;
-    md_phase_t phase;
-    size_t input_offset;
-    md_node_type_t node_type;
-    md_diag_detail_t detail;
-} md_diag_t;
-
-typedef struct md_allocator
-{
-    void *(*malloc)(size_t size);
-    void (*free)(void *ptr);
-    void *(*realloc)(void *ptr, size_t size);
-} md_allocator_t;
-
-#define MD_OFFSET_NONE ((size_t)-1)
-```
-
-失敗可能な操作は `md_status_t` を返す。
-
-`diag` は NULL を許可する。公開 API の必須文字列引数は NULL 終端された非 NULL ポインタで指定し、空文字列は `""` で表す。任意属性の文字列だけは、対応する存在フラグが false の場合に NULL を許可する。文字列には埋め込み NULL を許可せず、出力文字列は NULL 終端する。`size_t` は文字列長ではなく、allocator のサイズや診断の入力オフセットなど、別の用途に引き続き使用する。
-
-```c
-md_status_t md_allocator_config(const md_allocator_t *allocator,
-    md_diag_t *diag);
-
-md_status_t md_parse(const char *str, md_node_t **node, md_diag_t *diag);
-
-md_status_t md_node_get_type(const md_node_t *node, md_node_type_t *type,
-    md_diag_t *diag);
-
-md_status_t md_node_get_parent(const md_node_t *node, const md_node_t **parent,
-    md_diag_t *diag);
-
-md_status_t md_node_get_first_child(const md_node_t *node,
-    const md_node_t **first_child, md_diag_t *diag);
-
-md_status_t md_node_get_next_sibling(const md_node_t *node,
-    const md_node_t **next_sibling, md_diag_t *diag);
-
-md_status_t md_node_get_literal(const md_node_t *node, const char **value,
-    md_diag_t *diag);
-
-md_status_t md_heading_get_level(const md_node_t *node, unsigned int *level,
-    md_diag_t *diag);
-
-md_status_t md_list_get_attributes(const md_node_t *node, md_list_kind_t *kind,
-    unsigned long *start, md_list_delimiter_t *delimiter, int *tight,
-    md_diag_t *diag);
-	
-md_status_t md_link_get_attributes(const md_node_t *node,
-    const char **destination, const char **title, int *has_title,
-    md_diag_t *diag);
-
-md_status_t md_reference_definition_get_attributes(const md_node_t *node,
-    const char **label, const char **destination, const char **title,
-    int *has_title, md_diag_t *diag);
-
-md_status_t md_node_create( md_node_type_t type, md_node_t **node,
-    md_diag_t *diag);
-
-md_status_t md_node_insert_before( md_node_t *parent,
-    md_node_t *child, const md_node_t *before, md_diag_t *diag);
-
-md_status_t md_node_detach(md_node_t *node, md_node_t **out_node,
-    md_diag_t *diag);
-
-md_status_t md_node_destroy(md_node_t *node, md_diag_t *diag);
-
-md_status_t md_node_set_literal(md_node_t *node, const char *value,
-    md_diag_t *diag);
-
-md_status_t md_heading_set_level(md_node_t *node, unsigned int level,
-    md_diag_t *diag);
-
-md_status_t md_list_set_attributes(md_node_t *node, md_list_kind_t kind,
-    unsigned long start, md_list_delimiter_t delimiter, md_diag_t *diag);
-
-md_status_t md_list_set_tight(md_node_t *node, int tight, md_diag_t *diag);
-
-md_status_t md_link_set_attributes(md_node_t *node, const char *destination,
-    const char *title, int has_title, md_diag_t *diag);
-
-md_status_t md_reference_definition_set_attributes(md_node_t *node,
-    const char *label, const char *destination, const char *title,
-    int has_title, md_diag_t *diag);
-
-md_status_t md_serialize(md_node_t *node, const char **str, md_diag_t *diag);
-```
-
-`md_node_insert_before()` の `before` が NULL の場合、child を最後の子として追加する。`before` が指定された場合は parent の直接の子でなければならない。`md_node_create(MD_NODE_DOCUMENT, ...)` は document root を生成する。その他のノード種別では document に未接続の fragment を生成する。未接続の fragment は、許可された親子関係を満たす任意の親へ接続でき、接続成功時に親の所有下へ入る。親が document に接続済みの場合は child もその document に接続される。document root は `md_node_destroy()` で破棄できるが、切り離しおよび子としての追加はできない。
-
-アクセサ API は `md_status_t` を返し、失敗時に診断情報を設定する。入力ノードまたは出力引数が NULL の場合は `MD_INVALID_ARGUMENT` で失敗し、出力引数と AST を変更しない。成功時、ノード種別および参照先を出力引数へ設定する。親、最初の子または次の兄弟が存在しない場合、対応する出力ポインタには NULL を設定する。
-
-アクセサが返すノード参照および文字列属性へのポインタは所有権を移さず、そのノードまたは祖先が破棄・切り離し・編集されるまでだけ有効とする。文字列属性アクセサは NULL 終端された読み取り専用ポインタを返す。任意属性が未設定の場合は、対応する存在フラグを false とし、文字列ポインタを NULL とする。
-
-## 6. シリアライズ契約
+## 5. シリアライズ契約
 
 シリアライザは有効な AST だけを入力として受け付ける。無効な AST では、診断可能な失敗を返し、AST を変更せず、部分的な出力を成功結果として返してはならない。
 
 `md_serialize()` は document 内部の出力バッファとは別の一時バッファへ Markdown 全体を構築する。AST 検証、シリアライズおよび終端処理が成功した場合だけ、一時バッファを document の出力バッファと交換し、`str` にその NULL 終端文字列への読み取り専用ポインタを設定する。確保または再確保に失敗した場合は document の AST と出力バッファを部分的な結果へ変更せず、失敗を返す。
 
-`str` が指す文字列は document が所有し、document の破棄時に解放する。`md_serialize()` の次回呼び出し後は、呼び出し前に取得した出力ポインタを参照してはならない。これは再確保によるアドレス変更の有無にかかわらず適用する。シリアライズ結果を複数世代にわたって保持することはできない。
+シリアライズ結果の所有権および寿命は、公開 API の契約に従う。
 
 成功したシリアライズ結果を再解析した AST は、ノード種別、子ノード順序、意味属性およびテキスト内容について入力 AST と意味的に等価とする。ソース位置、入力時の記法選択、改行形式、および記法上のみ必要な空白は保持対象としない。
 
@@ -475,7 +215,7 @@ flowchart TD
 	Reparse --> Equivalent[意味的等価性を確認]
 ```
 
-### 6.1 正規化記法
+### 5.1 正規化記法
 
 シリアライザは常に LF を使用し、ブロック間を空行一つで区切る。
 
@@ -489,13 +229,13 @@ HTML ノードは literal を変更せず出力する。ハード改行はバッ
 
 テキストと属性は、出力文脈で再解析時にノード境界、ブロック開始またはリンク構文を変える ASCII 記号だけをバックスラッシュでエスケープする。エスケープ規則は block、inline、link destination、title および code fence の各シリアライザ関数で共有テーブルとして実装する。
 
-## 7. 検証方針
+## 6. 検証方針
 
 CommonMark 適合性テストは、CommonMark Spec 0.31.2 の公式 example を出現順に抽出した、リポジトリ管理下のテストフィクスチャを入力として実行する。各フィクスチャは example 番号、Markdown および期待 HTML を含む。
 
 生成時は単独の `.` 行で入力と期待値を区切り、`→` はタブへ戻す。各 example は Markdown を解析し、テスト専用 HTML アダプタで変換した結果を期待 HTML と比較する。比較時は改行コードだけを LF に正規化する。
 
-### 7.1 CommonMark フィクスチャ形式
+### 6.1 CommonMark フィクスチャ形式
 
 `tools/extract_commonmark_examples.js` は CommonMark Spec 0.31.2 の仕様書を入力として、`tests/fixtures/commonmark_0_31_2_examples.c` と対応するヘッダを生成する。
 
@@ -505,7 +245,7 @@ CommonMark 適合性テストは、CommonMark Spec 0.31.2 の公式 example を�
 
 CMake の configure、build および test は、Node.js、ネットワークまたは仕様書の取得を要求してはならない。フィクスチャはテスト専用ターゲットだけにリンクし、出荷ライブラリには含めない。
 
-### 7.2 無効 AST のテストフィクスチャ
+### 6.2 無効 AST のテストフィクスチャ
 
 `tests/support/invalid_ast_builder.h` と `tests/support/invalid_ast_builder.c` は、テスト専用の無効 AST フィクスチャを作る。これらは内部ヘッダだけを利用し、通常の公開 API には含めない。
 
@@ -519,23 +259,23 @@ API 品質テストは、AST の生成・編集・削除・走査、無効な編
 
 さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび document 所有出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。document 破棄後に出力ポインタを参照しないこと、失敗後に再シリアライズできることも検証する。
 
-## 8. 要件トレーサビリティ
+## 7. 要件トレーサビリティ
 
 | 要件 | 設計上の対応 |
 | --- | --- |
-| FR-1 | 第2節の入力検証・解析構成、および第7節の CommonMark 適合性検証。 |
-| FR-2 | 第3節の AST 所有権、不変条件、編集の原子性。 |
-| FR-3 | 第6節のシリアライズ契約と第7節のラウンドトリップ検証。 |
-| FR-4 | 第5節のグローバルアロケータ契約。 |
+| FR-1 | 第2節の入力検証・解析構成、および第6節の CommonMark 適合性検証。 |
+| FR-2 | 第3節の AST 所有権、不変条件、編集の原子性、および公開 API の編集操作契約。 |
+| FR-3 | 第5節のシリアライズ契約、第6節のラウンドトリップ検証、および公開 API の出力契約。 |
+| FR-4 | 公開 API のグローバルアロケータ契約。 |
 | FR-5 | 対応しないノード種別の拒否、およびコンポーネント分割。 |
 | NFR-1 | 第2.1節の C99 強制、出荷ターゲットおよび CTest 構成。 |
 | NFR-2 | 第2節および第3節の UTF-8 に関する呼び出し側前提条件。 |
-| NFR-3 | 第2節、第4節、第5節および第6節の失敗時契約。 |
-| VR-1 | 第7節の公式 CommonMark 適合性テスト。 |
-| VR-2 | 第6節および第7節の意味的等価性と AST 正規形。 |
-| VR-3 | 第3節、第4節、第5節および第7節の API 品質テスト。 |
+| NFR-3 | 第2節、第5節、公開 API の共通規則および各 API リファレンスの失敗時契約。 |
+| VR-1 | 第6節の公式 CommonMark 適合性テスト。 |
+| VR-2 | 第5節および第6節の意味的等価性と AST 正規形。 |
+| VR-3 | 第3節、公開 API の共通規則、各 API リファレンスおよび第6節の API 品質テスト。 |
 | VR-4 | 第2.1節の CMake configure、build、CTest 構成。CI サービスとコンパイラの最低版は後続設計で定める。 |
 
-## 9. 後続の決定事項
+## 8. 後続の決定事項
 
 CI サービス、コンパイラの最低対応版、性能目標、最大入力サイズ、最大ネスト深さ、および独自 Markdown 拡張は、実装の検証後に後続設計として定める。
