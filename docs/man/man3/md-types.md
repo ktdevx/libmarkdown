@@ -106,7 +106,7 @@ typedef struct md_allocator
 
 `md_node_type_t` は document、ブロックおよびインラインの固定ノード種別を表す。未知のノード種別は生成、編集およびシリアライズで拒否する。
 
-`md_list_kind_t` と `md_list_delimiter_t` は list ノードの種別と区切り文字を表す。`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ。3つのコールバックはすべて非 NULL でなければならない。
+`md_list_kind_t` と `md_list_delimiter_t` は list ノードの種別と区切り文字を表す。bullet list の delimiter は `MD_LIST_DELIMITER_NONE` 固定であり、ordered list は `MD_LIST_DELIMITER_PERIOD` または `MD_LIST_DELIMITER_PAREN` を使用する。`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ。3つのコールバックはすべて非 NULL でなければならない。
 
 ## STATUS
 

@@ -107,13 +107,13 @@ AST は次の固定ノード種別を使用する。公開 API における列�
 | インライン | `link` | リンク先、タイトル |
 | インライン | `image` | リンク先、タイトル |
 
-`list` の種別は bullet または ordered とする。bullet リストの開始番号および区切り文字は持たず、ordered リストの開始番号は 1 以上とする。
+`list` の種別は bullet または ordered とする。bullet リストの開始番号および区切り文字は持たず、`delimiter` は `MD_LIST_DELIMITER_NONE` とする。ordered リストの開始番号は 1 以上、区切り文字は period または paren とする。bullet リストに `MD_LIST_DELIMITER_NONE` 以外の delimiter を設定する操作は `MD_INVALID_AST` で失敗する。
 
 `heading` のレベルは 1 から 6 とする。タイトルを持たない `link`、`image` および `reference_definition` は、タイトルを未設定として表現する。
 
 `list` の tight/loose は明示的な意味属性とする。パーサーは CommonMark の規則に従って値を設定し、利用者は `md_list_set_tight()` で値を変更できる。
 
-複数のブロック子を持つ `list_item` を含む list を tight に設定する操作は `MD_INVALID_AST` で失敗する。子の追加が loose を必然とする場合、ライブラリは同じ操作で list を loose に更新する。子の削除では自動的に tight へ戻さない。
+複数のブロック子を持つ `list_item` を含む list を tight に設定する操作は `MD_INVALID_AST` で失敗する。`md_node_insert_before()` による子の追加が loose を必然とする場合、ライブラリは追加と同じ原子的な操作で list を loose に更新する。追加または list の更新に失敗した場合は、子の接続、所有権および list の tight/loose を変更しない。子の削除では自動的に tight へ戻さない。
 
 ### 3.2 親子関係マトリクス
 
@@ -129,12 +129,12 @@ AST は次の固定ノード種別を使用する。公開 API における列�
 | `list_item` | `list_item` 以外のブロック集合 | 1 |
 | `paragraph`、`heading`、`emphasis`、`strong` | インライン集合 | paragraph/emphasis/strong は 1、heading は 0 |
 | `link` | `link` 以外のインライン集合 | 0 |
-| `image` | インライン集合 | 0 |
+| `image` | なし | 0 |
 | `code_block`、`html_block`、`thematic_break`、`reference_definition`、`text`、`soft_break`、`hard_break`、`code`、`html_inline` | なし | 0 |
 
 `document`、`block_quote` および `list_item` の子に `reference_definition` を置ける。
 
-`reference_definition` は属性だけを持つ葉ノードである。`link` の子孫に `link` を置くことはできない。
+`reference_definition` と `image` は属性だけを持つ葉ノードである。`link` の子孫に `link` を置くことはできない。`link` の子には `image` を置けるが、`image` 自体には子を置けない。
 
 document は、NULL 終端された最新の Markdown 出力バッファと、その容量および未生成状態を内部に保持する。出力バッファは AST の意味属性ではなく document の派生状態である。出力バッファの所有権および寿命は、公開 API の契約に従う。
 
@@ -169,7 +169,7 @@ stateDiagram-v2
 
 パーサーは全 document を対象として参照定義を収集する。ラベル比較には CommonMark の大文字小文字折り畳みと Unicode 空白の正規化を用い、同じ正規化ラベルが複数ある場合は文書順で最初の定義を解決に使用する。すべての定義ノードは AST に保持する。
 
-参照リンクと短縮参照リンクは、解析時に解決済みの `link` または `image` ノードへ変換する。変換後のノードはリンク先とタイトルを持ち、入力の参照ラベルや記法を保持しない。未解決の参照は CommonMark の規則に従って通常テキストとして扱う。
+参照リンクと短縮参照リンクは、解析時に解決済みの `link` または `image` ノードへ変換する。変換後のノードはリンク先とタイトルを持ち、入力の参照ラベルや記法を保持しない。未解決の参照は CommonMark の規則に従って通常テキストとして扱う。解析後に reference_definition を追加、削除、移動または変更しても、既存の `link` と `image` は再解決しない。
 
 ### 3.5 AST 正規形
 
@@ -219,15 +219,25 @@ flowchart TD
 
 シリアライザは常に LF を使用し、ブロック間を空行一つで区切る。
 
-見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番の `.` 区切りで出力する。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
+見出しは ATX 形式、bullet list は `-`、ordered list は最初の項目を list の開始番号、後続項目を連番の `.` 区切りで出力する。tight list では list item 間および item 内のブロック間に空行を出力せず、loose list では各 list item のブロック境界を空行で区切る。block quote の各出力行には `> ` を付け、list item の継続行は marker と空白の幅だけインデントする。
 
-リンクと画像は常にインライン形式で出力する。`reference_definition` は AST 上の位置で、正規化済みラベル、リンク先およびタイトルから参照定義として出力する。
+リンクと画像は常にインライン形式で出力する。`reference_definition` は AST 上の位置で、正規化済みラベル、リンク先およびタイトルから参照定義として出力する。参照定義の順序は AST の子順序に従い、参照定義の追加、削除、移動または属性変更は既存の `link` と `image` の解決済み属性を変更しない。
 
 HTML ノードは literal を変更せず出力する。ハード改行はバックスラッシュと LF、ソフト改行は LF とする。
 
-コードブロックは内容に含まれる最長 run より一つ長く、少なくとも 3 文字の backtick fence を用いる。info string が backtick を含む場合は同じ規則の tilde fence を用いる。
+コードブロックは、backtick を fence に選ぶ場合は内容に含まれる最長 backtick run より一つ長く、少なくとも 3 文字の fence を用いる。info string が backtick を含む場合は tilde を選び、内容に含まれる最長 tilde run より一つ長く、少なくとも 3 文字の fence を用いる。info string の改行は許可せず、fence 文字列と info string の間には一つの空白を置く。
 
-テキストと属性は、出力文脈で再解析時にノード境界、ブロック開始またはリンク構文を変える ASCII 記号だけをバックスラッシュでエスケープする。エスケープ規則は block、inline、link destination、title および code fence の各シリアライザ関数で共有テーブルとして実装する。
+テキストと属性は、出力文脈で再解析時にノード境界、ブロック開始またはリンク構文を変える ASCII 記号だけをバックスラッシュでエスケープする。block 文脈では行頭の構文開始文字、inline 文脈では emphasis、link、image、hard break および HTML の開始に使われる文字、link destination 文脈では `)` と `\\`、title 文脈では区切り文字と `\\` を対象とする。バックスラッシュ自身は必要な文脈で二重化し、改行は各ノードの改行規則で出力する。code fence 文脈では選択した fence 文字の run と info string の backtick を衝突しない形で処理する。エスケープ規則は次表の優先順位で適用する。
+
+| 文脈 | エスケープの目的 | 必須条件 |
+| --- | --- | --- |
+| block | 行頭での block 開始を防ぐ | 構文開始文字の前に `\\` を置く。行頭の空白と改行は block 出力規則を優先する |
+| inline | ノード境界と inline 構文を保持する | `\\`、`*`、`_`、`[`、`]`、`<` および必要な `!` を構文として解釈されない形にする |
+| link destination | destination の終端を保持する | `\\` と `)` をエスケープし、空白を含む destination は angle-bracket 形式を使用する |
+| title | title の区切りを保持する | 選択した引用符と `\\` をエスケープし、改行は LF に正規化する |
+| code fence | code literal の終端を防ぐ | 選択した fence 文字の最長 run より長い fence を選び、info string の backtick は tilde fence を選ぶ |
+
+エスケープ後の各出力は再解析して、元のノード種別、境界および属性が得られることをラウンドトリップテストで確認する。
 
 ## 6. 検証方針
 
@@ -255,7 +265,9 @@ CMake の configure、build および test は、Node.js、ネットワークま
 
 ラウンドトリップテストは、Markdown を解析し、シリアライズ後に再解析して AST 正規形を比較する。AST 正規形にはノード種別、子ノード順序、意味属性およびテキスト内容を含める。ソース位置、入力時の記法および正規化された改行形式は含めない。
 
-API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネスト、document 所有出力の寿命、再シリアライズ時の旧ポインタ無効化および複数出力の同時保持不可を対象とする。
+API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、list delimiter の kind 別制約、tight list への子追加による loose 自動更新、image の葉制約、解析後の reference_definition 編集が既存 link/image を再解決しないこと、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネスト、document 所有出力の寿命、再シリアライズ時の旧ポインタ無効化および複数出力の同時保持不可を対象とする。
+
+シリアライザの境界テストは、bullet list の delimiter 不正値、tight/loose list の空行、内容中の backtick/tilde run、info string の backtick、文脈別の括弧・引用符・バックスラッシュ・構文開始文字、空 destination、改行を含む title、および inline link/image の再解析結果を対象とする。
 
 さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび document 所有出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。document 破棄後に出力ポインタを参照しないこと、失敗後に再シリアライズできることも検証する。
 

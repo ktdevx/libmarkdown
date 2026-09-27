@@ -18,3 +18,5 @@
 - 0015: [C API の文字列を NULL 終端文字列として扱う](0015-define-public-c-api-shape.md)
 - 0016: [md 接頭辞を公開 API 名前空間として使用する](0016-use-md-api-prefix.md)
 - 0017: [アロケータ設定変更時の責任境界を定義する](0017-define-allocator-change-responsibility.md)
+- 0018: [list delimiter の kind 別契約を定義する](0018-define-list-delimiter-contract.md)
+- 0019: [解析済み参照リンクの編集後挙動を固定する](0019-define-reference-editing-semantics.md)
