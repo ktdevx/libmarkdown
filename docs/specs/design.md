@@ -111,6 +111,8 @@ AST は次の固定ノード種別を使用する。公開 API における列�
 
 `heading` のレベルは 1 から 6 とする。タイトルを持たない `link`、`image` および `reference_definition` は、タイトルを未設定として表現する。`image` の alt は inline 子ノード列で表現し、空 alt は子ノード 0 個で表現する。alt の子には `link` と `image` を置かない。
 
+`code_block` のコード内容は literal 属性として、info string は専用の getter/setter として公開する。info string は改行を含まない有効な UTF-8 文字列とし、空文字列を許可する。具体的な引数、戻り値、所有権および失敗時の契約は公開 API リファレンスに従う。
+
 `list` の tight/loose は明示的な意味属性とする。パーサーは CommonMark の規則に従って値を設定し、利用者は `md_list_set_tight()` で値を変更できる。
 
 複数のブロック子を持つ `list_item` を含む list を tight に設定する操作は `MD_INVALID_AST` で失敗する。`md_node_insert_before()` による子の追加が loose を必然とする場合、ライブラリは追加と同じ原子的な操作で list を loose に更新する。追加または list の更新に失敗した場合は、子の接続、所有権および list の tight/loose を変更しない。子の削除では自動的に tight へ戻さない。

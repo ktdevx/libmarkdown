@@ -2,12 +2,16 @@
 
 ## NAME
 
-`md_node_set_literal`, `md_heading_get_level`, `md_heading_set_level`, `md_list_get_attributes`, `md_list_set_attributes`, `md_list_set_tight`, `md_link_get_attributes`, `md_link_set_attributes`, `md_image_get_attributes`, `md_image_set_attributes`, `md_reference_definition_get_attributes`, `md_reference_definition_set_attributes` - ノード固有属性を取得または変更する
+`md_node_set_literal`, `md_code_block_get_info`, `md_code_block_set_info`, `md_heading_get_level`, `md_heading_set_level`, `md_list_get_attributes`, `md_list_set_attributes`, `md_list_set_tight`, `md_link_get_attributes`, `md_link_set_attributes`, `md_image_get_attributes`, `md_image_set_attributes`, `md_reference_definition_get_attributes`, `md_reference_definition_set_attributes` - ノード固有属性を取得または変更する
 
 ## SYNOPSIS
 
 ```c
 md_status_t md_node_set_literal(md_node_t *node, const char *value, md_diag_t *diag);
+
+md_status_t md_code_block_get_info(const md_node_t *node, const char **info, md_diag_t *diag);
+
+md_status_t md_code_block_set_info(md_node_t *node, const char *info, md_diag_t *diag);
 
 md_status_t md_heading_get_level(const md_node_t *node, unsigned int *level, md_diag_t *diag);
 
@@ -34,7 +38,7 @@ md_status_t md_reference_definition_set_attributes(md_node_t *node, const char *
 
 ## DESCRIPTION
 
-`md_node_set_literal()` は literal を持つノードのテキストを設定する。heading の level は 1 から 6 とする。list の属性は kind、start、delimiter、tight である。bullet list の start は 0、delimiter は `MD_LIST_DELIMITER_NONE` とし、それ以外の値を設定する操作は `MD_INVALID_AST` で失敗する。ordered list の start は `MD_ORDERED_LIST_START_MIN` 以上 `MD_ORDERED_LIST_START_MAX` 以下（1 から 999999999）、delimiter は period または paren とする。
+`md_node_set_literal()` は literal を持つノードのテキストを設定する。`code_block` のコード内容は literal として扱い、info string は `md_code_block_get_info()` および `md_code_block_set_info()` で扱う。info string は改行を含まず、空文字列を許可する。シリアライズ時に info string が backtick を含む場合は tilde fence を選択する。heading の level は 1 から 6 とする。list の属性は kind、start、delimiter、tight である。bullet list の start は 0、delimiter は `MD_LIST_DELIMITER_NONE` とし、それ以外の値を設定する操作は `MD_INVALID_AST` で失敗する。ordered list の start は `MD_ORDERED_LIST_START_MIN` 以上 `MD_ORDERED_LIST_START_MAX` 以下（1 から 999999999）、delimiter は period または paren とする。
 
 `md_list_set_tight()` は list の tight/loose 属性を変更する。複数のブロック子を持つ `list_item` を含む list を tight に設定する操作は `MD_INVALID_AST` で失敗する。`md_node_insert_before()` による子の追加が loose を必然とする場合、追加と list の loose 化を一つの原子的な操作として行う。いずれかに失敗した場合は AST と list 属性を変更しない。子の削除では自動的に tight へ戻さない。
 
@@ -42,11 +46,11 @@ link、image および reference definition の title が未設定の場合、ge
 
 ## PARAMETERS
 
-必須の文字列引数は NULL 終端された有効な UTF-8 の非 NULL ポインタである。任意 title は `has_title` が false の場合にだけ NULL を許可する。image と link の getter/setter は同じ destination/title 契約に従う。getter の `node` および出力引数は非 NULL でなければならない。`diag` は NULL を許可する。
+必須の文字列引数は NULL 終端された有効な UTF-8 の非 NULL ポインタである。`md_code_block_get_info()` の `node` と `info`、および `md_code_block_set_info()` の `node` と `info` は NULL であってはならない。info string に改行を含めてはならない。任意 title は `has_title` が false の場合にだけ NULL を許可する。image と link の getter/setter は同じ destination/title 契約に従う。その他の getter の `node` および出力引数も非 NULL でなければならない。`diag` は NULL を許可する。
 
 ## RETURN VALUES
 
-成功時は `MD_OK` を返す。ノード種別に適用できない getter または setter、kind と整合しない delimiter、ordered list の start が `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` の範囲外である場合、その他の範囲外の属性値、または AST 不変条件を破る変更は `MD_INVALID_AST` で失敗し、AST と出力引数を変更しない。
+成功時は `MD_OK` を返す。ノード種別に適用できない getter または setter、info string に改行を含む場合、kind と整合しない delimiter、ordered list の start が `MD_ORDERED_LIST_START_MIN` から `MD_ORDERED_LIST_START_MAX` の範囲外である場合、その他の範囲外の属性値、または AST 不変条件を破る変更は `MD_INVALID_AST` で失敗し、AST と出力引数を変更しない。`md_code_block_get_info()` が返す文字列ポインタは所有権を移さず、対象ノードまたは祖先が破棄・切り離し・編集されるまで有効である。
 
 ## SEE ALSO
 
