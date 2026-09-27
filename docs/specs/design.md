@@ -233,7 +233,7 @@ HTML ノードは literal を変更せず出力する。ハード改行はバッ
 | 文脈 | エスケープの目的 | 必須条件 |
 | --- | --- | --- |
 | block | 行頭での block 開始を防ぐ | 構文開始文字の前に `\\` を置く。行頭の空白と改行は block 出力規則を優先する |
-| inline | ノード境界と inline 構文を保持する | `\\`、`*`、`_`、`[`、`]`、`<` および必要な `!` を構文として解釈されない形にする |
+| inline | ノード境界と inline 構文を保持する | `\\`、`*`、`_`、`[`、`]`、`<`、`` ` `` および必要な `!` を構文として解釈されない形にする |
 | link destination | destination の終端を保持する | `\\` と `)` をエスケープし、空白を含む destination は angle-bracket 形式を使用する |
 | title | title の区切りを保持する | 選択した引用符と `\\` をエスケープし、改行は LF に正規化する |
 | code fence | code literal の終端を防ぐ | 選択した fence 文字の最長 run より長い fence を選び、info string の backtick は tilde fence を選ぶ |
