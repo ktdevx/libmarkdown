@@ -154,7 +154,7 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 document の破棄は接続済みの根の子孫を破棄するが、既に切り離されたフラグメントは破棄しない。切り離されたフラグメントは `md_node_destroy()` で利用者が破棄する。
 
-各フラグメントは破棄時点のグローバルアロケータを参照するため、元の document が破棄された後も利用者がコールバックと `user_data` の寿命および互換性を保証する限り破棄できる。
+各フラグメントは破棄時点のグローバルアロケータを参照する。元の document が破棄された後も、利用者が設定変更前に確保されたメモリを新しいコールバックで扱えること、および設定変更とフラグメント操作の同期を保証する限り破棄できる。
 
 ノードの所有権状態を次に示す。
 
@@ -237,11 +237,15 @@ flowchart TD
 
 ## 5. メモリ管理
 
-`md_allocator_t` は利用者コンテキスト、allocate、reallocate および deallocate のコールバックを持つ公開構造体とする。
+`md_allocator_t` は malloc、free および realloc 相当のコールバックを持つ公開構造体とする。
 
 `md_allocator_configure()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。document root の生成を行う `md_node_create(MD_NODE_DOCUMENT, ...)` と `md_parse()` は現在のグローバルアロケータを参照する。
 
 設定変更は既存の document、関連する全ノードおよびその document から生成した Markdown 出力にも適用される。利用者は設定変更と document 操作を同期し、設定変更前に確保されたメモリを新しいアロケータで正しく扱えることを保証する。
+
+設定は3つのコールバックの値をライブラリ内部へコピーして保持する。非 NULL の設定では3つのコールバックをすべて必須とし、いずれかが NULL の場合は `MD_INVALID_ARGUMENT` を返して現在の設定を変更しない。
+
+`malloc` または `realloc` の失敗は NULL で表し、`realloc` の失敗時は元のポインタを変更しない。`free(NULL)` は何もしない。サイズ0の扱いと必要なアラインメントは、使用するコールバックが標準Cの対応する契約を満たすものとする。
 
 グローバルアロケータ契約は、document、関連する全ノードおよびその document から生成する Markdown 出力に操作時点で適用する。
 
@@ -269,13 +273,13 @@ flowchart TB
 | `md_node_destroy` | 切り離しノードまたは document root | 切り離しノードとその子孫、または document root と接続済みの木を破棄する。接続済みの通常ノードは拒否し、document root の破棄では切り離しフラグメントを保持する。 |
 | `md_serialize` | document root、Markdown 出力 | 成功時に `md_markdown_t` の所有権を利用者へ渡す。document root 以外は拒否し、失敗時に出力を返さない。 |
 | `md_markdown_data` | `md_markdown_t` | NULL 終端された出力文字列を読み取り専用で返す。 |
-| `md_markdown_destroy` | `md_markdown_t` | 出力を生成元 document のアロケータ契約で破棄する。 |
+| `md_markdown_destroy` | `md_markdown_t` | 操作時点のグローバルアロケータ契約で出力を破棄する。 |
 
 利用者はライブラリが提供する専用の破棄操作で AST および `md_markdown_t` を解放する。利用者がライブラリ所有のメモリを標準の `free()` などで直接解放してはならない。
 
 ### 5.1 公開ヘッダ契約
 
-公開ヘッダは `<stddef.h>` を含み、`md_node_t` および `md_markdown_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならず、`user_data` は各呼び出しへそのまま渡す。
+公開ヘッダは `<stddef.h>` を含み、`md_node_t` および `md_markdown_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならない。
 
 ```c
 typedef struct md_node md_node_t;
@@ -322,10 +326,9 @@ typedef struct md_diagnostic {
 } md_diagnostic_t;
 
 typedef struct md_allocator {
-	void *user_data;
-	void *(*allocate)(void *user_data, size_t size);
-	void *(*reallocate)(void *user_data, void *pointer, size_t size);
-	void (*deallocate)(void *user_data, void *pointer);
+	void *(*malloc)(size_t size);
+	void (*free)(void *pointer);
+	void *(*realloc)(void *pointer, size_t size);
 } md_allocator_t;
 
 #define MD_OFFSET_NONE ((size_t)-1)
@@ -457,6 +460,8 @@ CMake の configure、build および test は、Node.js、ネットワークま
 ラウンドトリップテストは、Markdown を解析し、シリアライズ後に再解析して AST 正規形を比較する。AST 正規形にはノード種別、子ノード順序、意味属性およびテキスト内容を含める。ソース位置、入力時の記法および正規化された改行形式は含めない。
 
 API 品質テストは、AST の生成・編集・削除・走査、無効な編集の原子性、既定およびカスタムアロケータ、不正引数、空文書、改行形式、深いネストを対象とする。
+
+さらに、アロケータAからBへの設定変更後に行う既存 document、ノード、切り離しフラグメントおよび出力の操作・破棄、不正な設定の拒否、設定失敗時の現在設定の保持、ならびに再確保失敗時の原子性を検証する。
 
 ## 8. 要件トレーサビリティ
 

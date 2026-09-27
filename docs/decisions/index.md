@@ -6,7 +6,7 @@
 - 0003: [CommonMark Spec 0.31.2 を準拠対象として選定する](0003-select-commonmark-0-31-2.md)
 - 0004: [Markdown シリアライズは意味的等価性を保持する](0004-define-semantic-markdown-serialization.md)
 - 0005: [公開 AST を所有権付きの検証可能な木構造とする](0005-define-public-ast-ownership-and-invariants.md)
-- 0006: [AST と関連出力に生成時のメモリアロケータ契約を適用する](0006-define-memory-allocator-contract.md)
+- 0006: [AST と関連出力にグローバルメモリアロケータ契約を適用する](0006-define-memory-allocator-contract.md)
 - 0007: [不透明な AST ハンドルとアクセサ API を使用する](0007-use-opaque-ast-handles-and-accessors.md)
 - 0008: [状態コードと呼び出し側診断オブジェクトを返す](0008-return-status-with-caller-diagnostic.md)
 - 0009: [抽出済みの CommonMark example をテストフィクスチャとして固定する](0009-vendor-extracted-commonmark-examples.md)
@@ -18,3 +18,4 @@
 - 0015: [リストの tightness を明示属性として編集する](0015-define-list-tightness-editing.md)
 - 0016: [C API の文字列を NULL 終端文字列として扱う](0016-define-public-c-api-shape.md)
 - 0017: [md 接頭辞を公開 API 名前空間として使用する](0017-use-md-api-prefix.md)
+- 0018: [アロケータ設定変更時の責任境界を定義する](0018-define-allocator-change-responsibility.md)
