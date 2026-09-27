@@ -1,8 +1,8 @@
-# libmarkdown 基盤設計書
+# libmarkdown 設計書
 
 ## 1. 目的と適用範囲
 
-本書は、libmarkdown の実装に必要な基盤設計を定義する。libmarkdown は、UTF-8 の Markdown 文字列と編集可能な AST を相互変換する C99 ライブラリである。
+本書は、libmarkdown の実装に必要な設計を定義する。libmarkdown は、UTF-8 の Markdown 文字列と編集可能な AST を相互変換する C99 ライブラリである。
 
 公開 API の型、関数および列挙型は `md_` 接頭辞を使用し、公開する列挙値、マクロおよび関連する定数は `MD_` 接頭辞を使用する。この規則は将来追加する公開識別子にも適用する。
 
@@ -81,7 +81,9 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 すべてのテキスト属性と属性値は有効な UTF-8 であることを呼び出し側が保証する。ライブラリは UTF-8 の妥当性を検証、正規化または補正しない。この前提に違反する入力を渡した場合の解析結果、シリアライズ結果、診断および文字化けは保証しない。対応しないノード種別、不正な属性、不正な親子関係、循環または共有を含む AST は無効とする。
 
-公開ヘッダは `md_document_t` および `md_node_t` を不完全型として宣言する。利用者はアクセサ API でノード種別、親、子、兄弟、テキストおよびノード固有属性を取得する。利用者はノード内部の可変フィールドへ直接アクセスせず、生成、属性変更、子の追加、切り離しおよび破棄の各 API を通じて編集する。
+公開ヘッダは `md_node_t` および `md_markdown_t` を不完全型として宣言する。document も `MD_NODE_DOCUMENT` を持つ `md_node_t` で表す。
+
+利用者はアクセサ API でノード種別、親、子、兄弟、テキストおよびノード固有属性を取得する。利用者はノード内部の可変フィールドへ直接アクセスせず、生成、属性変更、子の追加、切り離しおよび破棄の各 API を通じて編集する。
 
 ### 3.1 ノード種別と意味属性
 
@@ -140,15 +142,15 @@ AST のルートは `document` ノードとする。各ノードは高々一つ�
 
 ### 3.3 構築、編集および構造的不変条件
 
-`md_document_create()` が生成する空の document は有効な AST とする。
+`md_node_create(MD_NODE_DOCUMENT, ...)` が生成する空の document root は有効な AST とする。document root は `md_node_t` の一種だが、親を持たず、子として追加できず、切り離せない。document root と接続済み木は `md_node_destroy()` で破棄する。
 
-`md_node_create()` が生成する親を持たないノードは構築用フラグメントであり、最小子数を満たさなくてもよい。フラグメントへ子を追加する操作は、3.2 節の親子関係だけを検査する。
+`md_node_create(type, ...)` が生成する親を持たない通常ノードは、document に未接続の構築用フラグメントであり、最小子数を満たさなくてもよい。フラグメントの document 所属は持たず、フラグメントへ子を追加する操作は、3.2 節の親子関係だけを検査する。
 
 フラグメントまたは接続済み部分木を document へ追加する操作は、追加後の全体が 3.2 節の最小子数、必須属性、単一親、循環なし、共有なしおよび link の祖先制約を満たす場合だけ成功する。失敗時は親子関係と所有権を変更しない。
 
 接続済みの `list`、`list_item`、`block_quote`、`paragraph`、`emphasis` または `strong` から最後の子を切り離す操作は `MD_INVALID_AST` で失敗し、子は親の所有のままとする。これらのコンテナ全体を親から切り離す操作は許可する。
 
-同一の document に関連付けられたフラグメントだけを接続できる。異なる document に関連付けられた child を接続しようとする操作は `MD_INVALID_ARGUMENT` で失敗し、親子関係および所有権を変更しない。
+未接続のフラグメントは、親が document root であるかどうかにかかわらず、許可された親子関係を満たす親へ接続できる。`md_node_insert_before()` が成功した時点で、child とその子孫は親の所有下に入る。親が document に接続済みの場合は child もその document に接続された部分木となり、親が未接続の場合は child も未接続部分木にとどまる。接続に失敗した場合は、child の未接続状態、親子関係および所有権を変更しない。
 
 document の破棄は接続済みの根の子孫を破棄するが、既に切り離されたフラグメントは破棄しない。切り離されたフラグメントは `md_node_destroy()` で利用者が破棄する。
 
@@ -161,7 +163,7 @@ stateDiagram-v2
 	[*] --> Fragment: md_node_create
 	Fragment --> Connected: md_node_insert_before
 	Connected --> Fragment: md_node_detach
-	Connected --> [*]: md_document_destroy
+	Connected --> [*]: md_node_destroy(document root)
 	Fragment --> [*]: md_node_destroy
 ```
 
@@ -237,7 +239,7 @@ flowchart TD
 
 `md_allocator_t` は利用者コンテキスト、allocate、reallocate および deallocate のコールバックを持つ公開構造体とする。
 
-`md_allocator_configure()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。`md_document_create()` と `md_parse()` は現在のグローバルアロケータを参照する。
+`md_allocator_configure()` は現在の既定アロケータを設定し、NULL の場合は既定の `malloc()`、`realloc()`、`free()` に戻す。document root の生成を行う `md_node_create(MD_NODE_DOCUMENT, ...)` と `md_parse()` は現在のグローバルアロケータを参照する。
 
 設定変更は既存の document、関連する全ノードおよびその document から生成した Markdown 出力にも適用される。利用者は設定変更と document 操作を同期し、設定変更前に確保されたメモリを新しいアロケータで正しく扱えることを保証する。
 
@@ -260,14 +262,12 @@ flowchart TB
 | 操作 | 入力と出力 | 所有権・失敗時契約 |
 | --- | --- | --- |
 | `md_allocator_configure` | 既定アロケータ | 全 document の以後の操作が参照するグローバル契約を設定する。既存の document にも影響する。 |
-| `md_document_create` | document 出力 | 操作時点のグローバルアロケータを参照して空の document を渡す。失敗時は出力を設定しない。 |
-| `md_parse` | UTF-8 Markdown、document 出力 | 操作時点のグローバルアロケータを参照し、成功時に document の所有権を渡す。失敗時は document を返さない。 |
-| `md_node_create` | document、ノード種別、node 出力 | document 関連の切り離しフラグメントを利用者へ渡す。 |
-| `md_node_insert_before` | 親、切り離し子、挿入位置 | 成功時に親へ所有権を移す。`before` が NULL の場合は末尾へ追加する。失敗時は子の所有権を利用者に残す。 |
+| `md_parse` | UTF-8 Markdown、document root 出力 | 操作時点のグローバルアロケータを参照し、成功時に `MD_NODE_DOCUMENT` root の所有権を渡す。失敗時は document root を返さない。 |
+| `md_node_create` | ノード種別、node 出力 | `MD_NODE_DOCUMENT` では document root を、それ以外では document に未接続の fragment を利用者へ渡す。 |
+| `md_node_insert_before` | 親、未接続の子、挿入位置 | 成功時に親へ所有権を移し、child を親の document に接続する。`before` が NULL の場合は末尾へ追加する。失敗時は子の未接続状態と所有権を利用者に残す。 |
 | `md_node_detach` | 接続済みノード、node 出力 | 成功時に利用者へ所有権を移す。最後の必須子の切り離しは失敗する。 |
-| `md_node_destroy` | 切り離しノード | ノードとその子孫を破棄する。接続済みノードは拒否する。 |
-| `md_document_destroy` | document | document と接続済みの木を破棄する。切り離しフラグメントは保持する。 |
-| `md_serialize` | document、Markdown 出力 | 成功時に `md_markdown_t` の所有権を利用者へ渡す。失敗時に出力を返さない。 |
+| `md_node_destroy` | 切り離しノードまたは document root | 切り離しノードとその子孫、または document root と接続済みの木を破棄する。接続済みの通常ノードは拒否し、document root の破棄では切り離しフラグメントを保持する。 |
+| `md_serialize` | document root、Markdown 出力 | 成功時に `md_markdown_t` の所有権を利用者へ渡す。document root 以外は拒否し、失敗時に出力を返さない。 |
 | `md_markdown_data` | `md_markdown_t` | NULL 終端された出力文字列を読み取り専用で返す。 |
 | `md_markdown_destroy` | `md_markdown_t` | 出力を生成元 document のアロケータ契約で破棄する。 |
 
@@ -275,10 +275,9 @@ flowchart TB
 
 ### 5.1 公開ヘッダ契約
 
-公開ヘッダは `<stddef.h>` を含み、`md_document_t`、`md_node_t` および `md_markdown_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならず、`user_data` は各呼び出しへそのまま渡す。
+公開ヘッダは `<stddef.h>` を含み、`md_node_t` および `md_markdown_t` を不透明型として宣言する。`md_allocator_t` は次のコールバックを持つ。すべてのコールバックは NULL であってはならず、`user_data` は各呼び出しへそのまま渡す。
 
 ```c
-typedef struct md_document md_document_t;
 typedef struct md_node md_node_t;
 typedef struct md_markdown md_markdown_t;
 
@@ -339,14 +338,10 @@ typedef struct md_allocator {
 ```c
 md_status_t md_allocator_configure(const md_allocator_t *allocator,
 								 md_diagnostic_t *diagnostic);
-md_status_t md_document_create(md_document_t **out_document,
-							 md_diagnostic_t *diagnostic);
 md_status_t md_parse(const char *markdown,
-				   md_document_t **out_document,
+								 md_node_t **out_document,
 				   md_diagnostic_t *diagnostic);
-void md_document_destroy(md_document_t *document);
 
-md_node_t *md_document_root(md_document_t *document);
 md_node_type_t md_node_type_of(const md_node_t *node);
 const md_node_t *md_node_parent(const md_node_t *node);
 const md_node_t *md_node_first_child(const md_node_t *node);
@@ -367,7 +362,7 @@ md_status_t md_reference_definition_get_attributes(
 	const char **out_destination, const char **out_title, int *out_has_title,
 	md_diagnostic_t *diagnostic);
 
-md_status_t md_node_create(md_document_t *document, md_node_type_t type,
+md_status_t md_node_create(md_node_type_t type,
 						 md_node_t **out_node, md_diagnostic_t *diagnostic);
 md_status_t md_node_insert_before(md_node_t *parent, md_node_t *child,
 								const md_node_t *before,
@@ -392,14 +387,14 @@ md_status_t md_reference_definition_set_attributes(
 	const char *title, int has_title,
 	md_diagnostic_t *diagnostic);
 
-md_status_t md_serialize(const md_document_t *document,
+md_status_t md_serialize(const md_node_t *document,
 					   md_markdown_t **out_markdown,
 					   md_diagnostic_t *diagnostic);
 const char *md_markdown_data(const md_markdown_t *markdown);
 void md_markdown_destroy(md_markdown_t *markdown);
 ```
 
-`md_node_insert_before()` の `before` が NULL の場合、child を最後の子として追加する。`before` が指定された場合は parent の直接の子でなければならない。`md_node_create()` は `document` 型を拒否する。
+`md_node_insert_before()` の `before` が NULL の場合、child を最後の子として追加する。`before` が指定された場合は parent の直接の子でなければならない。`md_node_create(MD_NODE_DOCUMENT, ...)` は document root を生成する。その他のノード種別では document に未接続の fragment を生成する。未接続の fragment は、許可された親子関係を満たす任意の親へ接続でき、接続成功時に親の所有下へ入る。親が document に接続済みの場合は child もその document に接続される。document root は `md_node_destroy()` で破棄できるが、切り離しおよび子としての追加はできない。
 
 アクセサが返すノード参照は所有権を移さず、そのノードまたは祖先が破棄・切り離し・編集されるまでだけ有効とする。文字列属性アクセサは NULL 終端された読み取り専用ポインタを返し、所有権を移さない。任意属性が未設定の場合は、対応する存在フラグを false とし、文字列ポインタを NULL とする。
 
@@ -482,4 +477,4 @@ API 品質テストは、AST の生成・編集・削除・走査、無効な編
 
 ## 9. 後続の決定事項
 
-CI サービス、コンパイラの最低対応版、性能目標、最大入力サイズ、最大ネスト深さ、および独自 Markdown 拡張は、基盤実装の検証後に後続設計として定める。
+CI サービス、コンパイラの最低対応版、性能目標、最大入力サイズ、最大ネスト深さ、および独自 Markdown 拡張は、実装の検証後に後続設計として定める。
