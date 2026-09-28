@@ -28,14 +28,14 @@
 
 | 操作群 | 内容 |
 | --- | --- |
-| [md-types(3)](../man/man3/md-types.md) | 公開型、列挙値、定数、状態コードおよび診断。 |
-| [md-allocator(3)](../man/man3/md-allocator.md) | グローバルアロケータの設定と適用範囲。 |
-| [md-parse(3)](../man/man3/md-parse.md) | Markdown 文字列から document AST への解析。 |
-| [md-serialize(3)](../man/man3/md-serialize.md) | document AST から Markdown 文字列へのシリアライズ。 |
-| [md-node-lifecycle(3)](../man/man3/md-node-lifecycle.md) | AST ノードの生成と破棄。 |
-| [md-node-edit(3)](../man/man3/md-node-edit.md) | 親子関係の接続と切り離し。 |
-| [md-node-traverse(3)](../man/man3/md-node-traverse.md) | ノード種別、親子、兄弟および literal の取得。 |
-| [md-node-attributes(3)](../man/man3/md-node-attributes.md) | literal、code block の info string、heading、list、link、image、参照定義の属性操作。 |
+| [md-types(3)](../reference/api/md-types.md) | 公開型、列挙値、定数、状態コードおよび診断。 |
+| [md-allocator(3)](../reference/api/md-allocator.md) | グローバルアロケータの設定と適用範囲。 |
+| [md-parse(3)](../reference/api/md-parse.md) | Markdown 文字列から document AST への解析。 |
+| [md-serialize(3)](../reference/api/md-serialize.md) | document AST から Markdown 文字列へのシリアライズ。 |
+| [md-node-lifecycle(3)](../reference/api/md-node-lifecycle.md) | AST ノードの生成と破棄。 |
+| [md-node-edit(3)](../reference/api/md-node-edit.md) | 親子関係の接続と切り離し。 |
+| [md-node-traverse(3)](../reference/api/md-node-traverse.md) | ノード種別、親子、兄弟および literal の取得。 |
+| [md-node-attributes(3)](../reference/api/md-node-attributes.md) | literal、code block の info string、heading、list、link、image、参照定義の属性操作。 |
 
 ## 5. 文書の責務
 
