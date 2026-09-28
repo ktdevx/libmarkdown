@@ -52,9 +52,11 @@
 - 内容:
   - 親子関係の接続、切り離し、単一親制約、循環なし、共有なしを実装する。
   - `list`、`list_item`、`block_quote`、`paragraph`、`emphasis`、`strong` の最小子数契約を実装する。
+  - image の alt には `link` と `image` を含む inline 子を許可し、`link` 内の link は拒否する。
   - 失敗時にノード、所有権、親子関係を変更しない原子性を確保する。
 - 検証方法:
   - 不正な接続と切り離しが `MD_INVALID_AST` を返し、状態を変えないことを確認する。
+  - image alt 内の link/image の追加・走査・切り離しと、link 内の link の拒否を確認する。
   - 移動と切り離しの後に AST 正規形が安定することを確認する。
 - 依存関係: T2
 
@@ -66,10 +68,10 @@
 - 内容:
   - 各ノード種別固有の属性を専用 API で操作できるようにする。
   - ordered list の開始番号、delimiter、tight/loose の契約を実装する。
-  - image の alt を子ノードで表現する契約に沿って、属性 API と編集 API を分離する。
+  - image の alt を子ノードで表現する契約に沿って、属性 API と編集 API を分離し、nested link/image を保持する。
 - 検証方法:
   - 1 と 999999999 の受理、範囲外の拒否を確認する。
-  - bullet list の delimiter 制約、heading レベル、link/image/reference_definition の属性保持を確認する。
+  - bullet list の delimiter 制約、heading レベル、link/image/reference_definition の属性保持、image alt 内の nested link/image を確認する。
 - 依存関係: T2, T3
 
 ### T5. Markdown 解析を実装する
@@ -80,10 +82,11 @@
 - 内容:
   - UTF-8 Markdown を AST に変換する解析処理を実装する。
   - 参照定義の収集、解決順、未解決参照の扱いを設計書どおりに実装する。
+  - CommonMark の image description に含まれる link/image を image の alt 子ノードとして構築する。
   - HTML 出力やファイル I/O を含めない。
 - 検証方法:
   - CommonMark フィクスチャで期待 HTML との比較が通ることを確認する。
-  - 参照定義、空文書、改行形式、深いネストの境界を確認する。
+  - image 内の link/image、参照定義、空文書、改行形式、深いネストの境界を確認する。
 - 依存関係: T2, T3, T4
 
 ### T6. Markdown シリアライズを実装する
@@ -94,10 +97,10 @@
 - 内容:
   - 有効な AST から意味的に等価な Markdown を生成する。
   - 失敗時に AST と出力バッファを変更しない原子性を保つ。
-  - image の alt、リンク、コードブロック、参照定義、改行の正規化規則を実装する。
+  - image の alt と、その中の nested link/image、リンク、コードブロック、参照定義、改行の正規化規則を実装する。
 - 検証方法:
   - 再解析後に AST 正規形が一致することを確認する。
-  - 文字列、fence、エスケープ、出力寿命の境界を確認する。
+  - nested link/image を含む alt のエスケープ、文字列、fence、出力寿命の境界を確認する。
 - 依存関係: T2, T3, T4
 
 ### T7. グローバルアロケータ契約を実装する
@@ -121,6 +124,7 @@
 - 変更対象: テスト専用の AST 正規化、検証フック、診断補助、内部テストフック
 - 内容:
   - ノード種別、子順序、意味属性、テキスト内容を比較する正規形を実装する。
+  - image alt 内の link/image の子順序と属性を正規形へ含める。
   - テスト専用コードで不変条件違反 AST を構築できる補助を用意する。
   - 失敗診断を検証できるようにする。
   - `src/internal/ast_test_hooks.c` と、必要ならそれを使う内部ヘッダをテスト専用ターゲットにのみ公開する。
@@ -136,6 +140,7 @@
 - 変更対象: CTest 登録、テストターゲット、ラウンドトリップテスト、API テスト
 - 内容:
   - `libmarkdown_test_support`、`commonmark_conformance_test`、`roundtrip_test`、`api_test` を分離して登録する。
+  - image alt 内の nested link/image と、link 内の link 拒否を API/round-trip テストへ追加する。
   - `LIBMARKDOWN_TESTING` をテスト専用ターゲットにのみ定義し、出荷ライブラリへテスト専用コードを含めない。
   - CMake の configure、build、CTest 実行が設計書どおりの構成になるようにする。
 - 検証方法:
@@ -161,7 +166,7 @@
 
 - 対応要件: FR-2, FR-3, FR-4, FR-5, VR-3
 - 対応設計: 5, 6, 8, ADR 全般
-- 変更対象: `docs/specs/api.md`, `docs/man/man3/*.md`, 必要な ADR
+- 変更対象: `docs/specs/api.md`, `docs/reference/api/*.md`, 必要な ADR
 - 内容:
   - 公開 API 変更に伴う API 設計書の索引更新を行う。
   - 影響する公開シンボルについて man ページを追加または更新する。

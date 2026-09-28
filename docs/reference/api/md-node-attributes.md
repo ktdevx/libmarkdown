@@ -42,7 +42,7 @@ md_status_t md_reference_definition_set_attributes(md_node_t *node, const char *
 
 `md_list_set_tight()` は list の tight/loose 属性を変更する。複数のブロック子を持つ `list_item` を含む list を tight に設定する操作は `MD_INVALID_AST` で失敗する。`md_node_insert_before()` による子の追加が loose を必然とする場合、追加と list の loose 化を一つの原子的な操作として行う。いずれかに失敗した場合は AST と list 属性を変更しない。子の削除では自動的に tight へ戻さない。
 
-link、image および reference definition の title が未設定の場合、getter は対応する `has_title` を false とし、title ポインタを NULL とする。image の alt は文字列属性ではなく inline 子ノード列であり、`md_node_get_first_child()`、`md_node_get_next_sibling()` および `md_node_insert_before()` などの通常の走査・編集 API で扱う。image の子には `link` と `image` を置けない。reference definition の追加、削除、移動または属性変更は、既存の link と image の解決済み destination および title を変更しない。文字列属性へのポインタは所有権を移さず、ノードまたは祖先が破棄・切り離し・編集されるまでだけ有効である。
+link、image および reference definition の title が未設定の場合、getter は対応する `has_title` を false とし、title ポインタを NULL とする。image の alt は文字列属性ではなく inline 子ノード列であり、`md_node_get_first_child()`、`md_node_get_next_sibling()` および `md_node_insert_before()` などの通常の走査・編集 API で扱う。image の子には任意の inline ノードを置くことができ、`link` と `image` の入れ子も保持する。reference definition の追加、削除、移動または属性変更は、既存の link と image の解決済み destination および title を変更しない。文字列属性へのポインタは所有権を移さず、ノードまたは祖先が破棄・切り離し・編集されるまでだけ有効である。
 
 ## PARAMETERS
 

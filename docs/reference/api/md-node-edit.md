@@ -20,7 +20,7 @@ md_status_t md_node_detach(md_node_t *node, md_diag_t *diag);
 
 ## RETURN VALUES
 
-成功時は `MD_OK` を返す。接続に失敗した場合、`child` の未接続状態、親子関係、所有権および list の tight/loose は変更しない。切り離しに失敗した場合、`node` は親の所有のままとする。NULL 引数、許可されない親子関係、最小子数、image への `link` または `image` の追加、または木構造の不変条件を破る操作は失敗する。image へのその他の inline 子の追加は alt 内容として許可する。
+成功時は `MD_OK` を返す。接続に失敗した場合、`child` の未接続状態、親子関係、所有権および list の tight/loose は変更しない。切り離しに失敗した場合、`node` は親の所有のままとする。NULL 引数、許可されない親子関係、最小子数、link 内の link、または木構造の不変条件を破る操作は失敗する。image への inline 子の追加は alt 内容として許可し、`link` と `image` の入れ子も保持する。
 
 ## DIAGNOSTICS
 

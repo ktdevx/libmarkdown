@@ -20,7 +20,7 @@ md_status_t md_node_get_literal(const md_node_t *node, const char **value, md_di
 
 ## DESCRIPTION
 
-これらのアクセサはノード種別、親、最初の子、次の兄弟、または literal 属性を返す。image の最初の子および兄弟は alt を構成する inline 子ノードの走査に使用する。存在しない親、最初の子または次の兄弟は、対応する出力ポインタに NULL を設定する。
+これらのアクセサはノード種別、親、最初の子、次の兄弟、または literal 属性を返す。image の最初の子および兄弟は alt を構成する inline 子ノードの走査に使用し、その列には `link` または `image` が含まれる場合がある。存在しない親、最初の子または次の兄弟は、対応する出力ポインタに NULL を設定する。
 
 ## PARAMETERS
 
