@@ -1,0 +1,16 @@
+# ADR 一覧
+
+- [ADR-001: C99 を実装言語標準として選定する](001-select-c99.md)
+- [ADR-002: CMake をビルドシステムとして選定する](002-select-cmake.md)
+- [ADR-003: CommonMark Spec 0.31.2 を準拠対象として選定する](003-select-commonmark-0-31-2.md)
+- [ADR-004: Markdown シリアライズは意味的等価性を保持する](004-define-semantic-markdown-serialization.md)
+- [ADR-005: グローバルアロケータを採用する](005-define-memory-allocator-contract.md)
+- [ADR-006: 不透明な AST ハンドルとアクセサ API を使用する](006-use-opaque-ast-handles-and-accessors.md)
+- [ADR-007: 状態コードと呼び出し側診断オブジェクトを返す](007-return-status-with-caller-diagnostic.md)
+- [ADR-008: CommonMark フィクスチャを生成済み C データとして固定する](008-vendor-extracted-commonmark-examples.md)
+- [ADR-009: UTF-8 の妥当性を呼び出し側の前提条件とする](009-assume-valid-utf-8-input.md)
+- [ADR-010: 固定の CommonMark AST ノードモデルを使用する](010-use-fixed-commonmark-ast-node-model.md)
+- [ADR-011: 正規化された Markdown シリアライズ規則を採用する](011-define-canonical-markdown-serialization.md)
+- [ADR-012: アロケータ変更を許可し、安全性を利用者責任とする](012-define-allocator-change-responsibility.md)
+- [ADR-013: 解析済み参照リンクの属性を編集後も固定する](013-define-reference-editing-semantics.md)
+- [ADR-014: image の alt を inline 子ノードとして表現する](014-define-image-alt-representation.md)
